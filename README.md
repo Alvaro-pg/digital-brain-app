@@ -7,7 +7,7 @@
 
 - Diego: Frontend -> Diseño y implementación entera. 
 - Aaron: Backend -> Endpoints y de lógica de negocio
-- Mateo: Backend -> Transcripciones de Youtube
+- Mateo: Backend -> Transcripciones de Youtube, Audio, pdf's etc
 - Alvaro: Backend -> Lo que le apetezca
 
 
