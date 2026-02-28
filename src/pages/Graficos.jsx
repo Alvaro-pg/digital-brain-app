@@ -24,6 +24,7 @@ const transformDataForECharts = (backendData) => {
       name: node.label,
       category: categoryIndex,
       symbolSize: 40,
+      summary: node.summary || 'Sin resumen',
       tags: (node.tags && node.tags.length > 0) 
         ? node.tags.map(t => t.name).join(', ') 
         : 'Sin tags'
@@ -37,11 +38,10 @@ const transformDataForECharts = (backendData) => {
     lineStyle: {
       width: (edge.weight || 0.5) * 5
     },
-    label: {
-      show: false
-    },
-    // Guardamos el peso para el tooltip del link
-    edgeWeight: edge.weight
+    edgeWeight: edge.weight,
+    commonTags: (edge.common_tags && edge.common_tags.length > 0)
+      ? edge.common_tags.join(', ')
+      : ''
   }))
 
   return { nodes, links, categories }
@@ -74,7 +74,7 @@ function Graficos() {
           backgroundColor: 'transparent',
           title: {
             text: 'Grafo de Memorias',
-            subtext: 'Datos en tiempo real desde el Cerebro Digital',
+            subtext: 'Conexiones por Tags Compartidos',
             left: 'center',
             top: 20,
             textStyle: {
@@ -109,16 +109,20 @@ function Graficos() {
                   : '<span style="color: #6b7280; font-style: italic;">Sin etiquetas</span>'
 
                 return `
-                  <div style="padding: 10px; min-width: 180px; border-radius: 8px;">
+                  <div style="padding: 10px; min-width: 200px; border-radius: 8px;">
                     <div style="margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px;">
                       <strong style="color: #6366f1; font-size: 14px;">${params.name}</strong>
                     </div>
                     <div style="margin-bottom: 8px;">
-                      <span style="color: #9ca3af; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Tipo</span><br/>
+                      <span style="color: #9ca3af; font-size: 11px; text-transform: uppercase;">Resumen</span><br/>
+                      <span style="font-size: 12px; color: #cbd5e1; display: block; margin-top: 2px;">${nodeData.summary}</span>
+                    </div>
+                    <div style="margin-bottom: 8px;">
+                      <span style="color: #9ca3af; font-size: 11px; text-transform: uppercase;">Tipo</span><br/>
                       <span style="font-size: 13px; color: #fff;">${categories[nodeData.category].name}</span>
                     </div>
                     <div>
-                      <span style="color: #9ca3af; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Etiquetas</span><br/>
+                      <span style="color: #9ca3af; font-size: 11px; text-transform: uppercase;">Etiquetas</span><br/>
                       <div style="margin-top: 4px; display: flex; flex-wrap: wrap;">
                         ${tagPills}
                       </div>
@@ -129,7 +133,8 @@ function Graficos() {
               return `
                 <div style="padding: 5px;">
                   <strong>Relación Semántica</strong><br/>
-                  <span>Similitud: ${(params.data.edgeWeight * 100).toFixed(1)}%</span>
+                  <span>Similitud: ${(params.data.edgeWeight * 100).toFixed(1)}%</span><br/>
+                  ${params.data.commonTags ? `<span style="font-size: 11px; color: #a5b4fc;">Tags comunes: ${params.data.commonTags}</span>` : ''}
                 </div>
               `
             },
@@ -156,8 +161,8 @@ function Graficos() {
                 curveness: 0.1,
               },
               force: {
-                repulsion: 2000,
-                edgeLength: [100, 300],
+                repulsion: 2500,
+                edgeLength: [120, 350],
                 gravity: 0.1,
               },
               emphasis: {
@@ -190,8 +195,10 @@ function Graficos() {
 
     return () => {
       window.removeEventListener('resize', handleResize)
-      chartInstance.current?.dispose()
-      chartInstance.current = null
+      if (chartInstance.current) {
+        chartInstance.current.dispose()
+        chartInstance.current = null
+      }
     }
   }, [])
 
