@@ -87,7 +87,7 @@ function RightSidebar() {
     fileInputRef.current?.click()
   }
 
-  const handleSave = async () => {
+  const handleSave = async (mode = 'single') => {
     if (files.length > 0) {
       const filesToProcess = [...files]
       const prompt = filePrompt.trim() || "Procesa estos archivos y extrae la información relevante para mi cerebro digital."
@@ -106,7 +106,13 @@ function RightSidebar() {
       
       setIsProcessing(true)
       try {
-        const response = await brainService.askQuestion(prompt, filesToProcess)
+        let response;
+        if (mode === 'per-file') {
+          response = await brainService.processPerFile(prompt, filesToProcess)
+        } else {
+          response = await brainService.processSingleSummary(prompt, filesToProcess)
+        }
+        
         console.log('Brain response:', response)
         
         // Actualizamos estado a éxito en la cola
@@ -114,7 +120,7 @@ function RightSidebar() {
           newItems.find(ni => ni.id === item.id) ? { ...item, status: 'success' } : item
         ))
         
-        // Limpiamos los exitosos después de 3 segundos
+        // Limpiamos los exitosos después de 5 segundos
         setTimeout(() => {
           setProcessingQueue(prev => prev.filter(item => 
             !newItems.find(ni => ni.id === item.id)
@@ -402,19 +408,33 @@ function RightSidebar() {
             </div>
           )}
 
-          {/* Botón Guardar */}
-          <button
-            onClick={handleSave}
-            disabled={files.length === 0 || isProcessing}
-            className={`w-full py-3 rounded-xl text-white text-base font-medium transition-all
-              ${files.length > 0 && !isProcessing
-                ? 'bg-indigo-600 hover:bg-indigo-500 cursor-pointer shadow-[0_0_20px_rgba(79,70,229,0.3)]'
-                : 'bg-gray-700 cursor-not-allowed opacity-50'
-              }`}
-            style={{ fontFamily: 'Syncopate, sans-serif' }}
-          >
-            GUARDAR
-          </button>
+          {/* Botones de Acción */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleSave('single')}
+              disabled={files.length === 0 || isProcessing}
+              className={`flex-1 py-3 rounded-xl text-[11px] font-bold transition-all shadow-lg
+                ${files.length > 0 && !isProcessing
+                  ? 'bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer shadow-indigo-500/20'
+                  : 'bg-gray-700 text-gray-500 cursor-not-allowed opacity-50'
+                }`}
+              style={{ fontFamily: 'Syncopate, sans-serif' }}
+            >
+              PROCESAR JUNTOS
+            </button>
+            <button
+              onClick={() => handleSave('per-file')}
+              disabled={files.length === 0 || isProcessing}
+              className={`flex-1 py-3 rounded-xl text-[11px] font-bold transition-all border
+                ${files.length > 0 && !isProcessing
+                  ? 'bg-[#1a1744] border-indigo-500/50 text-indigo-300 hover:bg-indigo-600/10 cursor-pointer'
+                  : 'bg-gray-700 border-transparent text-gray-500 cursor-not-allowed opacity-50'
+                }`}
+              style={{ fontFamily: 'Syncopate, sans-serif' }}
+            >
+              PROCESAR CADA UNO
+            </button>
+          </div>
 
           {/* Espaciador */}
           <div className="flex-1" />
