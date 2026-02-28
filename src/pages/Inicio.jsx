@@ -1,138 +1,91 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
+import InsightCard from '../components/InsightCard'
+import CategoryCard from '../components/CategoryCard'
+import CategoryFilter from '../components/CategoryFilter'
+
+// Datos mockeados
+const mockInsights = [
+  { id: 1, title: 'Kemba Kalwer', category: 'Música', subcategory: 'eladiocarrionofficial', timeAgo: 'hace 1 hora', image: null },
+  { id: 2, title: 'Bad Bunny - Monaco', category: 'Música', subcategory: 'badbunny', timeAgo: 'hace 5 horas', image: null },
+  { id: 3, title: 'Tema de grafos TC', category: 'Informática', subcategory: 'Informática FIC', timeAgo: 'hace 2 días', image: null },
+  { id: 4, title: 'Estructuras de Datos', category: 'Informática', subcategory: 'Algoritmos', timeAgo: 'hace 4 días', image: null },
+  { id: 5, title: 'API REST con Node', category: 'Desarrollo Backend', subcategory: 'Node.js', timeAgo: 'hace 3 días', image: null },
+  { id: 6, title: 'PostgreSQL Avanzado', category: 'Desarrollo Backend', subcategory: 'Bases de Datos', timeAgo: 'hace 1 semana', image: null },
+  { id: 7, title: 'Docker Compose', category: 'Desarrollo Backend', subcategory: 'DevOps', timeAgo: 'hace 2 semanas', image: null },
+]
+
+const mockCategories = [
+  { id: 1, name: 'Informática FIC', slug: 'informatica-fic', image: null },
+  { id: 2, name: 'Música', slug: 'musica', image: null },
+  { id: 3, name: 'Memes', slug: 'memes', image: null },
+]
+
+const filterCategories = ['Todo', 'Música', 'Desarrollo Backend', 'Informática']
 
 function Inicio() {
-  const [files, setFiles] = useState([])
-  const [isDragging, setIsDragging] = useState(false)
-  const [isProcessing, setIsProcessing] = useState(false)
-  const fileInputRef = useRef(null)
+  const [activeCategory, setActiveCategory] = useState('Todo')
 
-  const handleDragOver = (e) => {
-    e.preventDefault()
-    setIsDragging(true)
-  }
-
-  const handleDragLeave = (e) => {
-    e.preventDefault()
-    setIsDragging(false)
-  }
-
-  const handleDrop = (e) => {
-    e.preventDefault()
-    setIsDragging(false)
-    const droppedFiles = Array.from(e.dataTransfer.files)
-    setFiles((prev) => [...prev, ...droppedFiles])
-  }
-
-  const handleFileSelect = (e) => {
-    const selectedFiles = Array.from(e.target.files)
-    setFiles((prev) => [...prev, ...selectedFiles])
-  }
-
-  const handleClick = () => {
-    fileInputRef.current?.click()
-  }
-
-  const handleGuardar = () => {
-    if (files.length > 0) {
-      setIsProcessing(true)
-      // Simular procesamiento
-      setTimeout(() => {
-        setIsProcessing(false)
-        setFiles([])
-      }, 3000)
-    }
-  }
+  // Filtrar insights según categoría activa
+  const filteredInsights = activeCategory === 'Todo'
+    ? mockInsights
+    : mockInsights.filter(insight => insight.category === activeCategory)
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-4 py-8">
-      {/* Contenedor principal estilo embudo */}
-      <div className="relative w-full max-w-2xl">
-        {/* Área de drop */}
-        <div className="flex items-stretch gap-2">
-          <div
-            onClick={handleClick}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            className={`flex-1 border-2 border-dashed rounded-2xl p-8 cursor-pointer transition-all duration-300
-              ${isDragging 
-                ? 'border-white bg-white/10 scale-105' 
-                : 'border-gray-500 hover:border-gray-400 bg-[#1a1744]'
-              }`}
-          >
-            <div className="flex flex-col items-center justify-center gap-4">
-              {/* Icono de documento */}
-              <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} 
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <p className="text-gray-300 text-center" style={{ fontFamily: 'Syncopate, sans-serif' }}>
-                {files.length > 0 
-                  ? `${files.length} archivo${files.length > 1 ? 's' : ''} seleccionado${files.length > 1 ? 's' : ''}`
-                  : 'Añade tus archivos aquí'
-                }
-              </p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                onChange={handleFileSelect}
-                className="hidden"
+    <div className="flex-1 flex flex-col px-6 py-6 overflow-y-auto">
+      {/* Filtro de categorías */}
+      <div className="mb-6 mx-10">
+        <CategoryFilter 
+          categories={filterCategories} 
+          activeCategory={activeCategory} 
+          onCategoryChange={setActiveCategory} 
+        />
+      </div>
+
+      <div className="px-10">
+      {/* Sección: Últimos Insights */}
+      <div className="mb-8 mt-10">
+        <h2 
+          className="text-white text-xl mb-4 lowercase"
+          style={{ fontFamily: 'Syncopate, sans-serif', fontWeight: '600' }}
+        >
+          {activeCategory === 'Todo' ? 'vuelve a tus últimos insights' : `insights de ${activeCategory.toLowerCase()}`}
+        </h2>
+        <div className="flex gap-6 overflow-x-auto pb-4">
+          {filteredInsights.length > 0 ? (
+            filteredInsights.map((insight) => (
+              <InsightCard
+                key={insight.id}
+                image={insight.image}
+                title={insight.title}
+                category={insight.subcategory}
+                timeAgo={insight.timeAgo}
               />
-            </div>
-          </div>
-
-          {/* Botón de micrófono */}
-          <button className="bg-[#1a1744] border-2 border-gray-500 rounded-2xl px-4 hover:border-gray-400 transition-colors">
-            <svg className="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-            </svg>
-          </button>
+            ))
+          ) : (
+            <p className="text-gray-400">No hay insights en esta categoría</p>
+          )}
         </div>
+      </div>
 
-        {/* Botón Guardar */}
-        <div className="flex justify-end mt-4">
-          <button
-            onClick={handleGuardar}
-            disabled={files.length === 0 || isProcessing}
-            className={`px-8 py-3 rounded-xl text-white font-medium transition-all
-              ${files.length > 0 && !isProcessing
-                ? 'bg-gray-500 hover:bg-gray-400 cursor-pointer'
-                : 'bg-gray-700 cursor-not-allowed opacity-50'
-              }`}
-            style={{ fontFamily: 'Syncopate, sans-serif' }}
-          >
-            Guardar
-          </button>
+      {/* Sección: Categorías */}
+      <div>
+        <h2 
+          className="text-white text-xl mb-4 lowercase"
+          style={{ fontFamily: 'Syncopate, sans-serif', fontWeight: '600' }}
+        >
+          categorías
+        </h2>
+        <div className="flex gap-4 overflow-x-auto pb-4">
+          {mockCategories.map((category) => (
+            <CategoryCard
+              key={category.id}
+              image={category.image}
+              name={category.name}
+              slug={category.slug}
+            />
+          ))}
         </div>
-
-        {/* Barra de procesamiento */}
-        {isProcessing && (
-          <div className="mt-6 bg-gray-200 rounded-xl p-4 flex items-center gap-4">
-            <svg className="animate-spin w-6 h-6 text-gray-600" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <span className="text-gray-700 font-medium">
-              Procesando {files.length} documento{files.length > 1 ? 's' : ''}...
-            </span>
-          </div>
-        )}
-
-        {/* Lista de archivos */}
-        {files.length > 0 && !isProcessing && (
-          <div className="mt-4 bg-[#1a1744] rounded-xl p-4 max-h-40 overflow-y-auto">
-            {files.map((file, index) => (
-              <div key={index} className="flex items-center gap-2 text-gray-300 py-1">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <span className="text-sm truncate">{file.name}</span>
-              </div>
-            ))}
-          </div>
-        )}
+      </div>
       </div>
     </div>
   )
