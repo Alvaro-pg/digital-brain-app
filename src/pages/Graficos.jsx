@@ -337,12 +337,10 @@ function Graficos() {
             <div className="h-1 w-20 bg-[#6366f1] rounded-full"></div>
           </header>
 
-          <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar relative">
             {panelLoading ? (
-              <div className="space-y-4">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="bg-white/5 h-32 rounded-xl animate-pulse" />
-                ))}
+              <div className="absolute inset-0 flex flex-col items-center justify-center space-y-4">
+                <div className="text-white text-sm animate-pulse font-['Syncopate'] tracking-tighter">Extrayendo Memorias...</div>
               </div>
             ) : memories.length > 0 ? (
               <div className="space-y-4 pb-10">
