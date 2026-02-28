@@ -172,11 +172,11 @@ function Graficos() {
             formatter: (params) => {
               if (params.dataType === 'node') {
                 const nodeData = params.data
-                const tagPills = (nodeData.tags && nodeData.tags !== 'Sin tags')
+                const tagPills = (nodeData.tags && nodeData.tags !== 'Sin categorías')
                   ? nodeData.tags.split(', ').map(tag => 
-                      `<span style="display: inline-block; background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); border-radius: 4px; padding: 2px 6px; margin: 2px; font-size: 10px; color: #a5b4fc;">#${tag}</span>`
+                      `<span style="display: inline-block; background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); border-radius: 4px; padding: 2px 6px; margin: 2px; font-size: 10px; color: #a5b4fc;">${tag}</span>`
                     ).join('')
-                  : '<span style="color: #6b7280; font-style: italic;">Sin etiquetas</span>'
+                  : '<span style="color: #6b7280; font-style: italic;">Sin categorías</span>'
 
                 return `
                   <div style="padding: 10px; min-width: 220px; border-radius: 8px;">
@@ -193,7 +193,7 @@ function Graficos() {
                       <span style="font-size: 13px; color: #fff;">${categories[nodeData.category].name}</span>
                     </div>
                     <div>
-                      <span style="color: #9ca3af; font-size: 11px; text-transform: uppercase;">Etiquetas</span><br/>
+                      <span style="color: #9ca3af; font-size: 11px; text-transform: uppercase;">Categorías</span><br/>
                       <div style="margin-top: 4px; display: flex; flex-wrap: wrap;">
                         ${tagPills}
                       </div>
@@ -203,7 +203,7 @@ function Graficos() {
               }
               const commonTagPills = (params.data.commonTags)
                 ? params.data.commonTags.split(', ').map(tag => 
-                    `<span style="display: inline-block; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 4px; padding: 1px 5px; margin: 2px; font-size: 10px; color: #a5b4fc;">#${tag}</span>`
+                    `<span style="display: inline-block; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 4px; padding: 1px 5px; margin: 2px; font-size: 10px; color: #a5b4fc;">${tag}</span>`
                   ).join('')
                 : '<span style="color: #6b7280; font-style: italic; font-size: 11px;">Sin tags en común</span>'
 
@@ -356,7 +356,7 @@ function Graficos() {
                     <div className="flex flex-wrap gap-2 mb-4">
                       {memo.tags?.map((tag, tIdx) => (
                         <span key={tIdx} className="text-[10px] bg-[#6366f1]/20 text-[#a5b4fc] px-2 py-0.5 rounded border border-[#6366f1]/40">
-                          #{tag}
+                          {tag}
                         </span>
                       ))}
                     </div>
