@@ -24,7 +24,9 @@ const transformDataForECharts = (backendData) => {
       name: node.label,
       category: categoryIndex,
       symbolSize: 40,
-      value: (node.tags && node.tags.length > 0) ? node.tags.join(', ') : 'Sin tags'
+      tags: (node.tags && node.tags.length > 0) 
+        ? node.tags.map(t => t.name).join(', ') 
+        : 'Sin tags'
     }
   })
 
@@ -99,11 +101,28 @@ function Graficos() {
             textStyle: { color: '#fff' },
             formatter: (params) => {
               if (params.dataType === 'node') {
+                const nodeData = params.data
+                const tagPills = (nodeData.tags && nodeData.tags !== 'Sin tags')
+                  ? nodeData.tags.split(', ').map(tag => 
+                      `<span style="display: inline-block; background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); border-radius: 4px; padding: 2px 6px; margin: 2px; font-size: 10px; color: #a5b4fc;">#${tag}</span>`
+                    ).join('')
+                  : '<span style="color: #6b7280; font-style: italic;">Sin etiquetas</span>'
+
                 return `
-                  <div style="padding: 5px;">
-                    <strong style="color: #6366f1;">${params.name}</strong><br/>
-                    <span style="font-size: 12px;">Tipo: ${categories[params.data.category].name}</span><br/>
-                    <span style="font-size: 12px;">Metadatos: ${params.data.value}</span>
+                  <div style="padding: 10px; min-width: 180px; border-radius: 8px;">
+                    <div style="margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px;">
+                      <strong style="color: #6366f1; font-size: 14px;">${params.name}</strong>
+                    </div>
+                    <div style="margin-bottom: 8px;">
+                      <span style="color: #9ca3af; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Tipo</span><br/>
+                      <span style="font-size: 13px; color: #fff;">${categories[nodeData.category].name}</span>
+                    </div>
+                    <div>
+                      <span style="color: #9ca3af; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Etiquetas</span><br/>
+                      <div style="margin-top: 4px; display: flex; flex-wrap: wrap;">
+                        ${tagPills}
+                      </div>
+                    </div>
                   </div>
                 `
               }
