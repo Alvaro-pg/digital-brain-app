@@ -99,6 +99,7 @@ function Graficos() {
   const chartInstance = useRef(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [isEmpty, setIsEmpty] = useState(false)
   
   // Estados para el panel lateral
   const [selectedKeyword, setSelectedKeyword] = useState(null)
@@ -117,6 +118,13 @@ function Graficos() {
         const backendResponse = await graphService.getGraphData()
         const { nodes, links, categories } = transformDataForECharts(backendResponse)
 
+        if (nodes.length === 0) {
+          setIsEmpty(true)
+          setLoading(false)
+          return
+        }
+
+        setIsEmpty(false)
         if (!chartInstance.current) {
           chartInstance.current = echarts.init(chartRef.current, 'dark')
           
@@ -308,6 +316,27 @@ function Graficos() {
             >
               Reintentar
             </button>
+          </div>
+        </div>
+      )}
+
+      {isEmpty && !loading && !error && (
+        <div className="absolute inset-0 flex items-center justify-center z-10 p-10 text-center">
+          <div className="bg-[#1a1744]/40 border border-[#6366f1]/30 backdrop-blur-md p-12 rounded-3xl max-w-lg shadow-[0_0_50px_rgba(99,102,241,0.15)] group transition-all hover:border-[#6366f1]/50">
+            <div className="mb-6 relative">
+              <div className="absolute inset-0 bg-[#6366f1]/20 blur-3xl rounded-full scale-150 animate-pulse"></div>
+              <svg className="w-20 h-20 text-[#6366f1] mx-auto relative group-hover:scale-110 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
+            </div>
+            <h3 className="text-2xl font-bold mb-4 text-white font-['Syncopate'] tracking-wider">Cerebro en Reposo</h3>
+            <p className="text-gray-400 leading-relaxed mb-8 font-['Inter']">
+              Aún no has guardado memorias o conocimientos suficientes para generar una red neuronal. 
+              ¡Empieza a subir archivos o chatear para ver cómo crece tu cerebro!
+            </p>
+            <div className="inline-block px-6 py-2 rounded-full bg-[#6366f1]/10 border border-[#6366f1]/20 text-[#a5b4fc] text-xs uppercase tracking-widest font-bold">
+              Esperando Datos...
+            </div>
           </div>
         </div>
       )}
