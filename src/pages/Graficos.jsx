@@ -32,17 +32,26 @@ const transformDataForECharts = (backendData) => {
   })
 
   // 3. Mapear enlaces (edges)
-  const links = backendData.edges.map(edge => ({
-    source: edge.source,
-    target: edge.target,
-    lineStyle: {
-      width: (edge.weight || 0.5) * 5
-    },
-    edgeWeight: edge.weight,
-    commonTags: (edge.common_tags && edge.common_tags.length > 0)
-      ? edge.common_tags.join(', ')
-      : ''
-  }))
+  const links = backendData.edges.map(edge => {
+    //Grosor minimo para que siempre sea visible
+    const minWidth = 1;
+    //Grosor maximo para que no sature la pantalla 
+    const maxWidth = 10; 
+    //Escalado basado en peso
+    const calculatedWidth = (edge.weight || 0.5) * 6; 
+    
+    return {
+      source: edge.source,
+      target: edge.target,
+      lineStyle: {
+        width: Math.max(minWidth, Math.min(maxWidth, calculatedWidth))
+      },
+      edgeWeight: edge.weight,
+      commonTags: (edge.common_tags && edge.common_tags.length > 0)
+        ? edge.common_tags.join(', ')
+        : ''
+    };
+  })
 
   return { nodes, links, categories }
 }
