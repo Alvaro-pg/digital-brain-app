@@ -99,6 +99,12 @@ function Graficos() {
   const chartInstance = useRef(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  
+  // Estados para el panel lateral
+  const [selectedKeyword, setSelectedKeyword] = useState(null)
+  const [memories, setMemories] = useState([])
+  const [isPanelOpen, setIsPanelOpen] = useState(false)
+  const [panelLoading, setPanelLoading] = useState(false)
 
   useEffect(() => {
     const initChart = async () => {
@@ -113,6 +119,25 @@ function Graficos() {
 
         if (!chartInstance.current) {
           chartInstance.current = echarts.init(chartRef.current, 'dark')
+          
+          // Evento de click para explorar memorias detalladas
+          chartInstance.current.on('click', async (params) => {
+            if (params.dataType === 'node') {
+              const keyword = params.name
+              setSelectedKeyword(keyword)
+              setIsPanelOpen(true)
+              setPanelLoading(true)
+              
+              try {
+                const response = await graphService.getMemoriesByKeyword(keyword)
+                setMemories(response.memories || [])
+              } catch (err) {
+                console.error('Error cargando memorias:', err)
+              } finally {
+                setPanelLoading(false)
+              }
+            }
+          })
         }
 
         const option = {
@@ -265,7 +290,7 @@ function Graficos() {
   }, [])
 
   return (
-    <div className="flex-1 flex flex-col p-4 relative">
+    <div className="flex-1 flex flex-col p-4 relative overflow-hidden">
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center z-10 bg-[#201C4E]/50 rounded-2xl">
           <div className="text-white text-xl animate-pulse font-['Syncopate']">Iniciando Red Neuronal...</div>
@@ -287,11 +312,66 @@ function Graficos() {
         </div>
       )}
 
+      {/* Grafo Principal */}
       <div 
         ref={chartRef} 
         className={`w-full flex-1 min-h-[500px] rounded-2xl transition-opacity duration-500 ${loading ? 'opacity-0' : 'opacity-100'}`}
         style={{ backgroundColor: 'rgba(26, 23, 68, 0.4)' }}
       />
+
+      {/* Panel Lateral de Detalles (Slide-over) */}
+      <div 
+        className={`fixed top-0 right-0 h-full w-[400px] bg-[#161344]/90 backdrop-blur-xl border-l border-white/10 shadow-2xl z-50 transform transition-transform duration-500 ease-in-out ${isPanelOpen ? 'translate-x-0' : 'translate-x-full'}`}
+      >
+        <div className="flex flex-col h-full p-6 pt-10 relative">
+          {/* Botón Cerrar */}
+          <button 
+            onClick={() => setIsPanelOpen(false)}
+            className="absolute top-4 right-4 text-[#6366f1]  text-2xl z-[60]"
+          >
+            ✕
+          </button>
+
+          <header className="mb-8">
+            <h2 className="text-2xl font-['Syncopate'] text-white uppercase tracking-wider mb-2">{selectedKeyword}</h2>
+            <div className="h-1 w-20 bg-[#6366f1] rounded-full"></div>
+          </header>
+
+          <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar relative">
+            {panelLoading ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center space-y-4">
+                <div className="text-white text-sm animate-pulse font-['Syncopate'] tracking-tighter">Extrayendo Memorias...</div>
+              </div>
+            ) : memories.length > 0 ? (
+              <div className="space-y-4 pb-10">
+                {memories.map((memo, idx) => (
+                  <div 
+                    key={idx} 
+                    className="bg-white/5 border border-white/10 p-4 rounded-xl hover:bg-white/10 transition-all group"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="text-[10px] uppercase tracking-widest text-[#6366f1] font-bold">{memo.type}</span>
+                    </div>
+                    <p className="text-white font-medium mb-3 line-clamp-2 leading-relaxed">{memo.summary}</p>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {memo.tags?.map((tag, tIdx) => (
+                        <span key={tIdx} className="text-[10px] bg-[#6366f1]/20 text-[#a5b4fc] px-2 py-0.5 rounded border border-[#6366f1]/40">
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="pt-3 border-t border-white/5">
+                      <p className="text-white/40 text-[11px] leading-relaxed italic">{memo.raw_content ? `"${memo.raw_content.substring(0, 100)}..."` : 'Sin contenido adicional'}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-20 text-white/30 italic">No se han encontrado memorias detalladas para este concepto.</div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
