@@ -7,53 +7,91 @@ import { graphService } from '../services/graphService'
  * Transforma los datos del backend al formato que entiende ECharts.
  */
 const transformDataForECharts = (backendData) => {
-  // 1. Extraer categorías únicas (types)
-  const types = Array.from(new Set(backendData.nodes.map(n => n.type || 'Sin tipo')))
   const colors = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4']
   
+  // 1. Agrupar nodos por 'label'
+  const groupedNodesMap = {}
+  backendData.nodes.forEach(node => {
+    if (!groupedNodesMap[node.label]) {
+      groupedNodesMap[node.label] = []
+    }
+    groupedNodesMap[node.label].push(node)
+  })
+
+  // 2. Crear nodos agrupados únicos
+  const uniqueNodes = []
+  const oldIdToGroupId = {}
+  const typesSet = new Set()
+
+  Object.keys(groupedNodesMap).forEach((label) => {
+    const nodesInGroup = groupedNodesMap[label]
+    const representative = nodesInGroup[0]
+    const groupId = `group_${label}`
+    
+    nodesInGroup.forEach(n => oldIdToGroupId[n.id] = groupId)
+    typesSet.add(representative.type || 'Sin tipo')
+
+    uniqueNodes.push({
+      id: groupId,
+      name: label,
+      type: representative.type || 'Sin tipo',
+      // Escalado: 40px base + 15px por cada nodo extra en el grupo
+      symbolSize: 40 + (nodesInGroup.length > 1 ? (nodesInGroup.length - 1) * 20 : 0),
+      summary: representative.summary || '',
+      tags: [...new Set(nodesInGroup.flatMap(n => n.tags || []).map(t => t.name))].join(', '),
+      groupCount: nodesInGroup.length
+    })
+  })
+
+  const types = Array.from(typesSet)
   const categories = types.map((type, index) => ({
     name: type,
     itemStyle: { color: colors[index % colors.length] }
   }))
 
-  // 2. Mapear nodos
-  const nodes = backendData.nodes.map(node => {
-    const categoryIndex = types.indexOf(node.type || 'Sin tipo')
-    return {
-      id: node.id,
-      name: node.label,
-      category: categoryIndex,
-      symbolSize: 40,
-      summary: node.summary || 'Sin resumen',
-      tags: (node.tags && node.tags.length > 0) 
-        ? node.tags.map(t => t.name).join(', ') 
-        : 'Sin tags'
+  uniqueNodes.forEach(node => {
+    node.category = types.indexOf(node.type)
+  })
+
+  // 3. Re-mapear y consolidar aristas
+  const consolidatedEdges = {}
+  backendData.edges.forEach(edge => {
+    const srcGroup = oldIdToGroupId[edge.source]
+    const targetGroup = oldIdToGroupId[edge.target]
+
+    if (srcGroup && targetGroup && srcGroup !== targetGroup) {
+      const edgeKey = [srcGroup, targetGroup].sort().join('--')
+      if (!consolidatedEdges[edgeKey]) {
+        consolidatedEdges[edgeKey] = {
+          source: srcGroup,
+          target: targetGroup,
+          weightSum: 0,
+          count: 0,
+          tags: new Set()
+        }
+      }
+      consolidatedEdges[edgeKey].weightSum += edge.weight || 0.5
+      consolidatedEdges[edgeKey].count++
+      if (edge.common_tags) edge.common_tags.forEach(t => consolidatedEdges[edgeKey].tags.add(t))
     }
   })
 
-  // 3. Mapear enlaces (edges)
-  const links = backendData.edges.map(edge => {
-    //Grosor minimo para que siempre sea visible
-    const minWidth = 1;
-    //Grosor maximo para que no sature la pantalla 
-    const maxWidth = 10; 
-    //Escalado basado en peso
-    const calculatedWidth = (edge.weight || 0.5) * 6; 
-    
+  const links = Object.values(consolidatedEdges).map(e => {
+    const avgWeight = e.weightSum / e.count
+    const minWidth = 1
+    const maxWidth = 10
     return {
-      source: edge.source,
-      target: edge.target,
+      source: e.source,
+      target: e.target,
       lineStyle: {
-        width: Math.max(minWidth, Math.min(maxWidth, calculatedWidth))
+        width: Math.max(minWidth, Math.min(maxWidth, avgWeight * 6))
       },
-      edgeWeight: edge.weight,
-      commonTags: (edge.common_tags && edge.common_tags.length > 0)
-        ? edge.common_tags.join(', ')
-        : ''
-    };
+      edgeWeight: avgWeight.toFixed(3),
+      commonTags: Array.from(e.tags).join(', ')
+    }
   })
 
-  return { nodes, links, categories }
+  return { nodes: uniqueNodes, links, categories }
 }
 
 function Graficos() {
@@ -70,11 +108,9 @@ function Graficos() {
         setLoading(true)
         setError(null)
         
-        // Obtener datos reales del backend
         const backendResponse = await graphService.getGraphData()
         const { nodes, links, categories } = transformDataForECharts(backendResponse)
 
-        // Inicializar ECharts si no está inicializado
         if (!chartInstance.current) {
           chartInstance.current = echarts.init(chartRef.current, 'dark')
         }
@@ -83,7 +119,7 @@ function Graficos() {
           backgroundColor: 'transparent',
           title: {
             text: 'Grafo de Memorias',
-            subtext: 'Conexiones por Tags Compartidos',
+            subtext: 'Conexiones por Tags Compartidos | Click para explorar',
             left: 'center',
             top: 20,
             textStyle: {
@@ -118,9 +154,10 @@ function Graficos() {
                   : '<span style="color: #6b7280; font-style: italic;">Sin etiquetas</span>'
 
                 return `
-                  <div style="padding: 10px; min-width: 200px; border-radius: 8px;">
-                    <div style="margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px;">
+                  <div style="padding: 10px; min-width: 220px; border-radius: 8px;">
+                    <div style="margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; display: flex; justify-content: space-between; align-items: baseline;">
                       <strong style="color: #6366f1; font-size: 14px;">${params.name}</strong>
+                      ${nodeData.groupCount > 1 ? `<span style="font-size: 10px; background: rgba(99, 102, 241, 0.3); padding: 1px 4px; border-radius: 3px; color: #a5b4fc;">x${nodeData.groupCount}</span>` : ''}
                     </div>
                     <div style="margin-bottom: 8px;">
                       <span style="color: #9ca3af; font-size: 11px; text-transform: uppercase;">Resumen</span><br/>
@@ -139,11 +176,27 @@ function Graficos() {
                   </div>
                 `
               }
+              const commonTagPills = (params.data.commonTags)
+                ? params.data.commonTags.split(', ').map(tag => 
+                    `<span style="display: inline-block; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 4px; padding: 1px 5px; margin: 2px; font-size: 10px; color: #a5b4fc;">#${tag}</span>`
+                  ).join('')
+                : '<span style="color: #6b7280; font-style: italic; font-size: 11px;">Sin tags en común</span>'
+
               return `
-                <div style="padding: 5px;">
-                  <strong>Relación Semántica</strong><br/>
-                  <span>Similitud: ${(params.data.edgeWeight * 100).toFixed(1)}%</span><br/>
-                  ${params.data.commonTags ? `<span style="font-size: 11px; color: #a5b4fc;">Tags comunes: ${params.data.commonTags}</span>` : ''}
+                <div style="padding: 10px; min-width: 180px; border-radius: 8px;">
+                  <div style="margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px;">
+                    <strong style="color: #6366f1; font-size: 13px;">Relación Semántica</strong>
+                  </div>
+                  <div style="margin-bottom: 8px;">
+                    <span style="color: #9ca3af; font-size: 11px; text-transform: uppercase;">Similitud</span><br/>
+                    <span style="font-size: 14px; color: #fff;">${(params.data.edgeWeight * 100).toFixed(1)}%</span>
+                  </div>
+                  <div>
+                    <span style="color: #9ca3af; font-size: 11px; text-transform: uppercase;">Tags Comunes</span><br/>
+                    <div style="margin-top: 4px; display: flex; flex-wrap: wrap;">
+                      ${commonTagPills}
+                    </div>
+                  </div>
                 </div>
               `
             },
