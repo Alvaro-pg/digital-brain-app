@@ -1,219 +1,208 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as echarts from 'echarts'
 import 'echarts-gl'
+import { graphService } from '../services/graphService'
 
-// Datos mockeados - Simulación de grafo de conocimiento
-const generateMockData = () => {
-  const categories = [
-    { name: 'Documentos', itemStyle: { color: '#6366f1' } },
-    { name: 'Conceptos', itemStyle: { color: '#22c55e' } },
-    { name: 'Personas', itemStyle: { color: '#f59e0b' } },
-    { name: 'Proyectos', itemStyle: { color: '#ef4444' } },
-    { name: 'Tecnologías', itemStyle: { color: '#06b6d4' } },
-  ]
+/**
+ * Transforma los datos del backend al formato que entiende ECharts.
+ */
+const transformDataForECharts = (backendData) => {
+  // 1. Extraer categorías únicas (types)
+  const types = Array.from(new Set(backendData.nodes.map(n => n.type || 'Sin tipo')))
+  const colors = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4']
+  
+  const categories = types.map((type, index) => ({
+    name: type,
+    itemStyle: { color: colors[index % colors.length] }
+  }))
 
-  const nodes = [
-    // Documentos
-    { name: 'Informe Q4', category: 0 },
-    { name: 'Propuesta Tech', category: 0 },
-    { name: 'Manual Usuario', category: 0 },
-    { name: 'Análisis Datos', category: 0 },
-    // Conceptos
-    { name: 'Machine Learning', category: 1 },
-    { name: 'Big Data', category: 1 },
-    { name: 'Cloud Computing', category: 1 },
-    { name: 'Blockchain', category: 1 },
-    { name: 'IoT', category: 1 },
-    // Personas
-    { name: 'Ana García', category: 2 },
-    { name: 'Carlos López', category: 2 },
-    { name: 'María Ruiz', category: 2 },
-    { name: 'Juan Martín', category: 2 },
-    // Proyectos
-    { name: 'Digital Brain', category: 3 },
-    { name: 'DataHub', category: 3 },
-    { name: 'SmartCity', category: 3 },
-    // Tecnologías
-    { name: 'React', category: 4 },
-    { name: 'Python', category: 4 },
-    { name: 'TensorFlow', category: 4 },
-    { name: 'Node.js', category: 4 },
-    { name: 'PostgreSQL', category: 4 },
-  ]
-
-  const links = [
-    // Digital Brain connections
-    { source: 'Digital Brain', target: 'Machine Learning' },
-    { source: 'Digital Brain', target: 'React' },
-    { source: 'Digital Brain', target: 'Python' },
-    { source: 'Digital Brain', target: 'Ana García' },
-    { source: 'Digital Brain', target: 'Carlos López' },
-    { source: 'Digital Brain', target: 'Informe Q4' },
-    // Machine Learning connections
-    { source: 'Machine Learning', target: 'TensorFlow' },
-    { source: 'Machine Learning', target: 'Python' },
-    { source: 'Machine Learning', target: 'Big Data' },
-    { source: 'Machine Learning', target: 'Análisis Datos' },
-    // DataHub connections
-    { source: 'DataHub', target: 'Big Data' },
-    { source: 'DataHub', target: 'Cloud Computing' },
-    { source: 'DataHub', target: 'PostgreSQL' },
-    { source: 'DataHub', target: 'María Ruiz' },
-    // SmartCity connections
-    { source: 'SmartCity', target: 'IoT' },
-    { source: 'SmartCity', target: 'Cloud Computing' },
-    { source: 'SmartCity', target: 'Juan Martín' },
-    // Other connections
-    { source: 'Propuesta Tech', target: 'Blockchain' },
-    { source: 'Propuesta Tech', target: 'Carlos López' },
-    { source: 'Manual Usuario', target: 'React' },
-    { source: 'Node.js', target: 'React' },
-    { source: 'Big Data', target: 'Cloud Computing' },
-    { source: 'Ana García', target: 'María Ruiz' },
-    { source: 'TensorFlow', target: 'Python' },
-  ]
-
-  // Calcular peso de cada nodo basado en número de conexiones
-  const nodeWeights = {}
-  links.forEach(link => {
-    nodeWeights[link.source] = (nodeWeights[link.source] || 0) + 1
-    nodeWeights[link.target] = (nodeWeights[link.target] || 0) + 1
-  })
-
-  // Encontrar peso máximo y mínimo para normalizar
-  const weights = Object.values(nodeWeights)
-  const maxWeight = Math.max(...weights)
-  const minWeight = Math.min(...weights)
-
-  // Tamaño mínimo y máximo de los nodos
-  const minSize = 20
-  const maxSize = 60
-
-  // Asignar symbolSize basado en el peso normalizado
-  const nodesWithSize = nodes.map(node => {
-    const weight = nodeWeights[node.name] || 1
-    // Normalizar el peso al rango [0, 1] y escalar al tamaño
-    const normalizedWeight = (weight - minWeight) / (maxWeight - minWeight || 1)
-    const symbolSize = minSize + normalizedWeight * (maxSize - minSize)
-    
+  // 2. Mapear nodos
+  const nodes = backendData.nodes.map(node => {
+    const categoryIndex = types.indexOf(node.type || 'Sin tipo')
     return {
-      ...node,
-      symbolSize: Math.round(symbolSize),
-      value: weight, // Guardar peso para tooltip
+      id: node.id,
+      name: node.label,
+      category: categoryIndex,
+      symbolSize: 40,
+      value: (node.tags && node.tags.length > 0) ? node.tags.join(', ') : 'Sin tags'
     }
   })
 
-  return { nodes: nodesWithSize, links, categories }
+  // 3. Mapear enlaces (edges)
+  const links = backendData.edges.map(edge => ({
+    source: edge.source,
+    target: edge.target,
+    lineStyle: {
+      width: (edge.weight || 0.5) * 5
+    },
+    label: {
+      show: false
+    },
+    // Guardamos el peso para el tooltip del link
+    edgeWeight: edge.weight
+  }))
+
+  return { nodes, links, categories }
 }
 
 function Graficos() {
   const chartRef = useRef(null)
   const chartInstance = useRef(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
-    if (!chartRef.current) return
+    const initChart = async () => {
+      if (!chartRef.current) return
 
-    // Inicializar ECharts
-    chartInstance.current = echarts.init(chartRef.current, 'dark')
+      try {
+        setLoading(true)
+        setError(null)
+        
+        // Obtener datos reales del backend
+        const backendResponse = await graphService.getGraphData()
+        const { nodes, links, categories } = transformDataForECharts(backendResponse)
 
-    const { nodes, links, categories } = generateMockData()
+        // Inicializar ECharts si no está inicializado
+        if (!chartInstance.current) {
+          chartInstance.current = echarts.init(chartRef.current, 'dark')
+        }
 
-    const option = {
-      backgroundColor: 'transparent',
-      title: {
-        text: 'Grafo de Conocimiento',
-        subtext: 'Digital Brain',
-        left: 'center',
-        top: 20,
-        textStyle: {
-          color: '#fff',
-          fontFamily: 'Syncopate, sans-serif',
-          fontSize: 24,
-        },
-        subtextStyle: {
-          color: '#9ca3af',
-          fontFamily: 'Syncopate, sans-serif',
-        },
-      },
-      legend: {
-        data: categories.map((c) => c.name),
-        orient: 'vertical',
-        left: 20,
-        top: 80,
-        textStyle: {
-          color: '#fff',
-        },
-      },
-      tooltip: {
-        trigger: 'item',
-        formatter: (params) => {
-          if (params.dataType === 'node') {
-            return `<strong>${params.name}</strong><br/>Categoría: ${categories[params.data.category].name}<br/>Conexiones: ${params.data.value}`
-          }
-          return `${params.data.source} → ${params.data.target}`
-        },
-      },
-      series: [
-        {
-          type: 'graph',
-          layout: 'force',
-          nodes: nodes.map((node) => ({
-            ...node,
-            itemStyle: categories[node.category].itemStyle,
-          })),
-          links: links,
-          categories: categories,
-          roam: true,
-          draggable: true,
-          label: {
-            show: true,
-            position: 'right',
-            formatter: '{b}',
-            fontSize: 12,
-            color: '#fff',
-          },
-          lineStyle: {
-            color: 'source',
-            opacity: 0.4,
-            width: 2,
-            curveness: 0.1,
-          },
-          force: {
-            repulsion: 500,
-            gravity: 0.1,
-            edgeLength: [100, 200],
-            layoutAnimation: true,
-          },
-          emphasis: {
-            focus: 'adjacency',
-            lineStyle: {
-              width: 4,
+        const option = {
+          backgroundColor: 'transparent',
+          title: {
+            text: 'Grafo de Memorias',
+            subtext: 'Datos en tiempo real desde el Cerebro Digital',
+            left: 'center',
+            top: 20,
+            textStyle: {
+              color: '#fff',
+              fontFamily: 'Syncopate, sans-serif',
+              fontSize: 24,
+            },
+            subtextStyle: {
+              color: '#9ca3af',
+              fontFamily: 'Inter, sans-serif',
             },
           },
-        },
-      ],
+          legend: {
+            data: categories.map((c) => c.name),
+            orient: 'vertical',
+            left: 20,
+            top: 80,
+            textStyle: { color: '#fff' },
+          },
+          tooltip: {
+            trigger: 'item',
+            backgroundColor: 'rgba(26, 23, 68, 0.9)',
+            borderColor: '#6366f1',
+            textStyle: { color: '#fff' },
+            formatter: (params) => {
+              if (params.dataType === 'node') {
+                return `
+                  <div style="padding: 5px;">
+                    <strong style="color: #6366f1;">${params.name}</strong><br/>
+                    <span style="font-size: 12px;">Tipo: ${categories[params.data.category].name}</span><br/>
+                    <span style="font-size: 12px;">Metadatos: ${params.data.value}</span>
+                  </div>
+                `
+              }
+              return `
+                <div style="padding: 5px;">
+                  <strong>Relación Semántica</strong><br/>
+                  <span>Similitud: ${(params.data.edgeWeight * 100).toFixed(1)}%</span>
+                </div>
+              `
+            },
+          },
+          series: [
+            {
+              type: 'graph',
+              layout: 'force',
+              nodes: nodes,
+              links: links,
+              categories: categories,
+              roam: true,
+              draggable: true,
+              label: {
+                show: true,
+                position: 'right',
+                formatter: '{b}',
+                color: '#fff',
+                fontSize: 12,
+              },
+              lineStyle: {
+                color: 'source',
+                opacity: 0.6,
+                curveness: 0.1,
+              },
+              force: {
+                repulsion: 2000,
+                edgeLength: [100, 300],
+                gravity: 0.1,
+              },
+              emphasis: {
+                focus: 'adjacency',
+                lineStyle: {
+                  width: 8,
+                },
+                label: {
+                  show: true,
+                  fontWeight: 'bold',
+                }
+              },
+            },
+          ],
+        }
+
+        chartInstance.current.setOption(option)
+        setLoading(false)
+      } catch (err) {
+        console.error('Error al cargar el grafo:', err)
+        setError('No se pudo conectar con el servidor de Digital Brain. Asegúrate de que el backend está corriendo.')
+        setLoading(false)
+      }
     }
 
-    chartInstance.current.setOption(option)
+    initChart()
 
-    // Resize handler
-    const handleResize = () => {
-      chartInstance.current?.resize()
-    }
+    const handleResize = () => chartInstance.current?.resize()
     window.addEventListener('resize', handleResize)
 
     return () => {
       window.removeEventListener('resize', handleResize)
       chartInstance.current?.dispose()
+      chartInstance.current = null
     }
   }, [])
 
   return (
-    <div className="flex-1 flex flex-col p-4">
+    <div className="flex-1 flex flex-col p-4 relative">
+      {loading && (
+        <div className="absolute inset-0 flex items-center justify-center z-10 bg-[#201C4E]/50 rounded-2xl">
+          <div className="text-white text-xl animate-pulse font-['Syncopate']">Iniciando Red Neuronal...</div>
+        </div>
+      )}
+      
+      {error && (
+        <div className="absolute inset-0 flex items-center justify-center z-10 p-10 text-center">
+          <div className="bg-red-500/20 border border-red-500 text-white p-6 rounded-xl max-w-md">
+            <h3 className="text-xl font-bold mb-2">Error de Conexión</h3>
+            <p>{error}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="mt-4 px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg transition-colors"
+            >
+              Reintentar
+            </button>
+          </div>
+        </div>
+      )}
+
       <div 
         ref={chartRef} 
-        className="w-full flex-1 min-h-[500px] rounded-2xl"
-        style={{ backgroundColor: 'rgba(26, 23, 68, 0.5)' }}
+        className={`w-full flex-1 min-h-[500px] rounded-2xl transition-opacity duration-500 ${loading ? 'opacity-0' : 'opacity-100'}`}
+        style={{ backgroundColor: 'rgba(26, 23, 68, 0.4)' }}
       />
     </div>
   )
