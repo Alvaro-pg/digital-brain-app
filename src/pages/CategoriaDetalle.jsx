@@ -1,7 +1,8 @@
 import { useParams, Link } from 'react-router-dom'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as echarts from 'echarts'
 import InsightCard from '../components/InsightCard'
+import OrbitSpinner from '../components/OrbitSpinner'
 
 // Datos de grafos por categoría
 const categoryGraphData = {
@@ -160,6 +161,16 @@ function CategoriaDetalle() {
   const graphData = categoryGraphData[slug]
   const chartRef = useRef(null)
   const chartInstance = useRef(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Simular carga de datos
+  useEffect(() => {
+    setIsLoading(true)
+    const timer = setTimeout(() => {
+      setIsLoading(false)
+    }, 1500)
+    return () => clearTimeout(timer)
+  }, [slug])
 
   // Inicializar grafo
   useEffect(() => {
@@ -253,7 +264,7 @@ function CategoriaDetalle() {
       window.removeEventListener('resize', handleResize)
       chartInstance.current?.dispose()
     }
-  }, [graphData])
+  }, [graphData, isLoading])
 
   if (!category) {
     return (
@@ -275,6 +286,21 @@ function CategoriaDetalle() {
         >
           Volver al inicio
         </Link>
+      </div>
+    )
+  }
+
+  // Mostrar spinner mientras carga
+  if (isLoading) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-6">
+        <OrbitSpinner size={60} />
+        <p 
+          className="text-gray-400 mt-6 lowercase"
+          style={{ fontFamily: 'Syncopate, sans-serif' }}
+        >
+          cargando {category.name.toLowerCase()}...
+        </p>
       </div>
     )
   }

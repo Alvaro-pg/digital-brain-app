@@ -1,4 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
+import OrbitSpinner from './OrbitSpinner'
+import FunnelIcon from './FunnelIcon'
+
+const AI_MODELS = [
+  { id: 'gpt-4', name: 'GPT-4', provider: 'OpenAI' },
+  { id: 'gpt-3.5', name: 'GPT-3.5', provider: 'OpenAI' },
+  { id: 'claude-3', name: 'Claude 3', provider: 'Anthropic' },
+  { id: 'gemini-pro', name: 'Gemini Pro', provider: 'Google' },
+  { id: 'llama-3', name: 'Llama 3', provider: 'Meta' },
+]
 
 function RightSidebar() {
   const [activeTab, setActiveTab] = useState('archivos')
@@ -9,9 +19,13 @@ function RightSidebar() {
   const [messages, setMessages] = useState([])
   const [inputMessage, setInputMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [selectedModel, setSelectedModel] = useState(AI_MODELS[0])
+  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false)
+  const [isFunnelAnimating, setIsFunnelAnimating] = useState(false)
   const fileInputRef = useRef(null)
   const chatEndRef = useRef(null)
   const sidebarRef = useRef(null)
+  const modelDropdownRef = useRef(null)
 
   // Expandir panel cuando hay archivos nuevos
   useEffect(() => {
@@ -25,6 +39,10 @@ function RightSidebar() {
     const handleClickOutside = (event) => {
       if (sidebarRef.current && !sidebarRef.current.contains(event.target) && isPanelExpanded && !isProcessing) {
         setIsPanelExpanded(false)
+      }
+      // Cerrar dropdown de modelos
+      if (modelDropdownRef.current && !modelDropdownRef.current.contains(event.target)) {
+        setIsModelDropdownOpen(false)
       }
     }
 
@@ -49,11 +67,17 @@ function RightSidebar() {
     setIsDragging(false)
     const droppedFiles = Array.from(e.dataTransfer.files)
     setFiles((prev) => [...prev, ...droppedFiles])
+    // Trigger funnel animation
+    setIsFunnelAnimating(true)
+    setTimeout(() => setIsFunnelAnimating(false), 700)
   }
 
   const handleFileSelect = (e) => {
     const selectedFiles = Array.from(e.target.files)
     setFiles((prev) => [...prev, ...selectedFiles])
+    // Trigger funnel animation
+    setIsFunnelAnimating(true)
+    setTimeout(() => setIsFunnelAnimating(false), 700)
   }
 
   const handleClick = () => {
@@ -235,21 +259,18 @@ function RightSidebar() {
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            className={`border-2 border-dashed rounded-xl p-6 cursor-pointer transition-all duration-300 mb-4
+            className={`border-2 border-dashed rounded-lg aspect-square cursor-pointer transition-all duration-300 mb-4 flex items-center justify-center
               ${isDragging 
                 ? 'border-white bg-white/10 scale-105' 
                 : 'border-gray-600 hover:border-gray-400 bg-[#1a1744]'
               }`}
           >
             <div className="flex flex-col items-center gap-3">
-              <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} 
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
+              <FunnelIcon size={120} isAnimating={isFunnelAnimating} isDragging={isDragging} />
               <p className="text-gray-400 text-sm text-center" style={{ fontFamily: 'Syncopate, sans-serif' }}>
                 {files.length > 0 
                   ? `${files.length} archivo${files.length > 1 ? 's' : ''}`
-                  : 'Arrastra archivos aquí'
+                  : 'Arrastra información aquí'
                 }
               </p>
               <input
@@ -311,6 +332,55 @@ function RightSidebar() {
       {/* Contenido de Chat */}
       {activeTab === 'chat' && (
         <div className="flex flex-col flex-1">
+          {/* Selector de modelo */}
+          <div className="mb-4 relative" ref={modelDropdownRef}>
+            <button
+              onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
+              className="w-full bg-[#1a1744] border border-gray-600 rounded-xl p-3 flex items-center justify-between hover:border-gray-400 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                <div className="flex flex-col items-start">
+                  <span className="text-white text-sm">{selectedModel.name}</span>
+                  <span className="text-gray-500 text-xs">{selectedModel.provider}</span>
+                </div>
+              </div>
+              <svg className={`w-4 h-4 text-gray-400 transition-transform ${isModelDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            
+            {/* Dropdown de modelos */}
+            {isModelDropdownOpen && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a1744] border border-gray-600 rounded-xl overflow-hidden z-10">
+                {AI_MODELS.map((model) => (
+                  <button
+                    key={model.id}
+                    onClick={() => {
+                      setSelectedModel(model)
+                      setIsModelDropdownOpen(false)
+                    }}
+                    className={`w-full p-3 flex items-center gap-3 hover:bg-[#252250] transition-colors ${
+                      selectedModel.id === model.id ? 'bg-[#252250]' : ''
+                    }`}
+                  >
+                    {selectedModel.id === model.id && (
+                      <svg className="w-4 h-4 text-purple-400" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                      </svg>
+                    )}
+                    <div className={`flex flex-col items-start ${selectedModel.id !== model.id ? 'ml-7' : ''}`}>
+                      <span className="text-white text-sm">{model.name}</span>
+                      <span className="text-gray-500 text-xs">{model.provider}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Mensajes */}
           <div className="flex-1 bg-[#1a1744] rounded-xl p-3 mb-4 overflow-y-auto max-h-[calc(100vh-250px)]">
             {messages.length === 0 ? (
@@ -337,10 +407,7 @@ function RightSidebar() {
                 ))}
                 {isLoading && (
                   <div className="bg-[#252250] text-gray-300 mr-4 p-3 rounded-lg text-sm flex items-center gap-2">
-                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
+                    <OrbitSpinner size={20} />
                     Pensando...
                   </div>
                 )}
