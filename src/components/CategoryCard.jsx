@@ -76,7 +76,7 @@ function CategoryCard({ image, name, color = '#1a1744', slug, type = 'folder' })
           <div className="w-full h-full flex items-center justify-center">
             {getIconByType(type)}
           </div>
-        )}}
+        )}
       </div>
       
       {/* Nombre de categoría */}
