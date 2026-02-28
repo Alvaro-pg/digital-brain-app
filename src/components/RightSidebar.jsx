@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import OrbitSpinner from './OrbitSpinner'
 import FunnelIcon from './FunnelIcon'
+import { brainService } from '../services/brainService'
 
 const AI_MODELS = [
   { id: 'gpt-4', name: 'GPT-4', provider: 'OpenAI' },
@@ -22,6 +23,8 @@ function RightSidebar() {
   const [selectedModel, setSelectedModel] = useState(AI_MODELS[0])
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false)
   const [isFunnelAnimating, setIsFunnelAnimating] = useState(false)
+  const [filePrompt, setFilePrompt] = useState('')
+  const [processingQueue, setProcessingQueue] = useState([]) // Cola de archivos en proceso
   const fileInputRef = useRef(null)
   const chatEndRef = useRef(null)
   const sidebarRef = useRef(null)
@@ -84,13 +87,48 @@ function RightSidebar() {
     fileInputRef.current?.click()
   }
 
-  const handleGuardar = () => {
+  const handleSave = async () => {
     if (files.length > 0) {
+      const filesToProcess = [...files]
+      const prompt = filePrompt.trim() || "Procesa estos archivos y extrae la información relevante para mi cerebro digital."
+      
+      // Movemos a la cola de procesamiento inmediatamente
+      const newItems = filesToProcess.map(f => ({ 
+        id: Math.random().toString(36).substr(2, 9),
+        name: f.name, 
+        size: f.size,
+        status: 'pending' 
+      }))
+      
+      setProcessingQueue(prev => [...prev, ...newItems])
+      setFiles([]) // Limpiamos el área de drop
+      setFilePrompt('')
+      
       setIsProcessing(true)
-      setTimeout(() => {
+      try {
+        const response = await brainService.askQuestion(prompt, filesToProcess)
+        console.log('Brain response:', response)
+        
+        // Actualizamos estado a éxito en la cola
+        setProcessingQueue(prev => prev.map(item => 
+          newItems.find(ni => ni.id === item.id) ? { ...item, status: 'success' } : item
+        ))
+        
+        // Limpiamos los exitosos después de 3 segundos
+        setTimeout(() => {
+          setProcessingQueue(prev => prev.filter(item => 
+            !newItems.find(ni => ni.id === item.id)
+          ))
+        }, 5000)
+        
+      } catch (err) {
+        console.error('Error al procesar archivos:', err)
+        setProcessingQueue(prev => prev.map(item => 
+          newItems.find(ni => ni.id === item.id) ? { ...item, status: 'error' } : item
+        ))
+      } finally {
         setIsProcessing(false)
-        setFiles([])
-      }, 3000)
+      }
     }
   }
 
@@ -292,26 +330,85 @@ function RightSidebar() {
             <span className="text-gray-300 text-sm" style={{ fontFamily: 'Syncopate, sans-serif' }}>GRABAR</span>
           </button>
 
+          {/* Input de Prompt para Archivos (Instrucción) */}
+          {hasFiles && !isProcessing && (
+            <div className="mb-4">
+              <label className="text-[10px] text-gray-500 mb-1 block uppercase font-bold tracking-tighter" style={{ fontFamily: 'Syncopate, sans-serif' }}>
+                Instrucción opcional
+              </label>
+              <textarea
+                value={filePrompt}
+                onChange={(e) => setFilePrompt(e.target.value)}
+                placeholder="Ej: Resume estos archivos..."
+                className="w-full bg-[#1a1744] border border-gray-600 rounded-xl p-3 text-white text-xs resize-none focus:outline-none focus:border-indigo-500 transition-all"
+                rows={2}
+              />
+            </div>
+          )}
+
           {/* Barra de procesamiento */}
           {isProcessing && (
-            <div className="bg-[#1a1744] rounded-xl p-3 mb-4 flex items-center gap-3">
-              <svg className="animate-spin w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <span className="text-gray-400 text-sm">
-                Procesando...
-              </span>
+            <div className="bg-[#1a1744] border border-indigo-500/30 rounded-xl p-4 mb-4 flex flex-col items-center gap-3 animate-pulse">
+              <div className="flex items-center gap-3">
+                <OrbitSpinner size={24} />
+                <span className="text-indigo-300 text-sm font-['Syncopate'] tracking-tighter">
+                  Procesando Conocimiento...
+                </span>
+              </div>
+              <div className="w-full bg-gray-800 h-1 rounded-full overflow-hidden">
+                <div className="bg-indigo-500 h-full animate-shimmer" style={{ width: '100%' }}></div>
+              </div>
+            </div>
+          )}
+
+          {/* Cola de Procesamiento */}
+          {processingQueue.length > 0 && (
+            <div className="mb-6 bg-[#1a1744]/50 rounded-xl p-4 border border-white/5">
+              <h4 className="text-[10px] text-indigo-400 mb-4 uppercase font-bold tracking-widest" style={{ fontFamily: 'Syncopate, sans-serif' }}>
+                Cola de Procesamiento
+              </h4>
+              <div className="space-y-3">
+                {processingQueue.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between bg-white/5 rounded-lg p-3 border border-white/5 group transition-all">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <div className="flex-shrink-0">
+                        {item.status === 'pending' && <OrbitSpinner size={16} />}
+                        {item.status === 'success' && (
+                          <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                        {item.status === 'error' && (
+                          <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        )}
+                      </div>
+                      <div className="flex flex-col overflow-hidden">
+                        <span className="text-white text-xs truncate font-medium">{item.name}</span>
+                        <span className={`text-[10px] uppercase font-bold tracking-tighter ${
+                          item.status === 'pending' ? 'text-indigo-400' : 
+                          item.status === 'success' ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          {item.status === 'pending' ? 'Procesando...' : 
+                           item.status === 'success' ? 'Completado' : 'Error en Carga'}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-[9px] text-gray-500 font-mono">{formatFileSize(item.size)}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
           {/* Botón Guardar */}
           <button
-            onClick={handleGuardar}
+            onClick={handleSave}
             disabled={files.length === 0 || isProcessing}
             className={`w-full py-3 rounded-xl text-white text-base font-medium transition-all
               ${files.length > 0 && !isProcessing
-                ? 'bg-indigo-600 hover:bg-indigo-500 cursor-pointer'
+                ? 'bg-indigo-600 hover:bg-indigo-500 cursor-pointer shadow-[0_0_20px_rgba(79,70,229,0.3)]'
                 : 'bg-gray-700 cursor-not-allowed opacity-50'
               }`}
             style={{ fontFamily: 'Syncopate, sans-serif' }}
