@@ -152,7 +152,7 @@ function Graficos() {
           backgroundColor: 'transparent',
           title: {
             text: 'Grafo de Memorias',
-            subtext: 'Conexiones por Tags Compartidos | Click para explorar',
+            subtext: 'Conexiones por Categorías Compartidas | Click para explorar',
             left: 'center',
             top: 20,
             textStyle: {
@@ -194,7 +194,7 @@ function Graficos() {
                     </div>
                     <div style="margin-bottom: 8px;">
                       <span style="color: #9ca3af; font-size: 11px; text-transform: uppercase;">Resumen</span><br/>
-                      <span style="font-size: 12px; color: #cbd5e1; display: block; margin-top: 2px;">${nodeData.summary}</span>
+                      <span style="font-size: 12px; color: #cbd5e1; display: block; margin-top: 2px; white-space: normal; max-width: 300px; word-break: break-word; line-height: 1.4;">${nodeData.summary}</span>
                     </div>
                     <div style="margin-bottom: 8px;">
                       <span style="color: #9ca3af; font-size: 11px; text-transform: uppercase;">Tipo</span><br/>
@@ -213,7 +213,7 @@ function Graficos() {
                 ? params.data.commonTags.split(', ').map(tag => 
                     `<span style="display: inline-block; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 4px; padding: 1px 5px; margin: 2px; font-size: 10px; color: #a5b4fc;">${tag}</span>`
                   ).join('')
-                : '<span style="color: #6b7280; font-style: italic; font-size: 11px;">Sin tags en común</span>'
+                : '<span style="color: #6b7280; font-style: italic; font-size: 11px;">Sin categorías en común</span>'
 
               return `
                 <div style="padding: 10px; min-width: 180px; border-radius: 8px;">
@@ -225,7 +225,7 @@ function Graficos() {
                     <span style="font-size: 14px; color: #fff;">${(params.data.edgeWeight * 100).toFixed(1)}%</span>
                   </div>
                   <div>
-                    <span style="color: #9ca3af; font-size: 11px; text-transform: uppercase;">Tags Comunes</span><br/>
+                    <span style="color: #9ca3af; font-size: 11px; text-transform: uppercase;">Categorías Comunes</span><br/>
                     <div style="margin-top: 4px; display: flex; flex-wrap: wrap;">
                       ${commonTagPills}
                     </div>
