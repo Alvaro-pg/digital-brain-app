@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import * as echarts from 'echarts'
 import 'echarts-gl'
 import { graphService } from '../services/graphService'
+import OrbitSpinner from '../components/OrbitSpinner'
 
 /**
  * Transforma los datos del backend al formato que entiende ECharts.
@@ -310,7 +311,8 @@ function Graficos() {
   return (
     <div className="flex-1 flex flex-col p-4 relative overflow-hidden">
       {loading && (
-        <div className="absolute inset-0 flex items-center justify-center z-10 bg-[#201C4E]/50 rounded-2xl">
+        <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-[#201C4E]/50 rounded-2xl gap-4">
+          <OrbitSpinner size={60} fadeIn={true} />
           <div className="text-white text-xl animate-pulse font-['Syncopate']">Iniciando Red Neuronal...</div>
         </div>
       )}

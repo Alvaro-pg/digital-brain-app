@@ -61,9 +61,10 @@ function CategoriaDetalle() {
           category: memory.tags?.[0] || memory.type,
           subcategory: memory.keyword,
           timeAgo: getTimeAgo(memory.created_at),
+          createdAt: new Date(memory.created_at),
           image: null,
           type: memory.type === 'youtube' ? 'youtube' : memory.type === 'nota' ? 'pdf' : 'code',
-          isAIGenerated: memory.status === 'processed',
+          isAIGenerated: memory.generated === true,
           description: memory.raw_content,
           tags: memory.tags || []
         }))
@@ -72,6 +73,9 @@ function CategoriaDetalle() {
         const filteredMemories = mappedMemories.filter(memory => 
           memory.category === tagName
         )
+        
+        // Ordenar de más nuevo a más viejo
+        filteredMemories.sort((a, b) => b.createdAt - a.createdAt)
         
         setMemories(filteredMemories)
       } catch (error) {

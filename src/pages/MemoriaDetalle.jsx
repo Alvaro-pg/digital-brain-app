@@ -109,30 +109,48 @@ const getIconByType = (type) => {
 function MemoriaDetalle() {
   const { memoryId } = useParams()
   const [memory, setMemory] = useState(null)
+  const [allTags, setAllTags] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  // Cargar memoria del backend
+  // Cargar memoria y tags del backend
   useEffect(() => {
-    const fetchMemory = async () => {
+    const fetchData = async () => {
       setIsLoading(true)
       setError(null)
       try {
-        const response = await fetch(`http://localhost:8000/memory/${memoryId}`, {
-          headers: { 'Accept': 'application/json' }
-        })
-        if (!response.ok) throw new Error('Error al cargar memoria')
-        const data = await response.json()
-        setMemory(data.memory)
+        const [memoryRes, tagsRes] = await Promise.all([
+          fetch(`http://localhost:8000/memory/${memoryId}`, {
+            headers: { 'Accept': 'application/json' }
+          }),
+          fetch('http://localhost:8000/tag/', {
+            headers: { 'Accept': 'application/json' }
+          })
+        ])
+        if (!memoryRes.ok) throw new Error('Error al cargar memoria')
+        const memoryData = await memoryRes.json()
+        setMemory(memoryData.memory)
+        
+        if (tagsRes.ok) {
+          const tagsData = await tagsRes.json()
+          setAllTags(tagsData.tags || [])
+        }
+        console.log('Memoria cargada:', memoryData.memory)
       } catch (err) {
-        console.error('Error fetching memory:', err)
+        console.error('Error fetching data:', err)
         setError('No se pudo cargar la memoria')
       } finally {
         setIsLoading(false)
       }
     }
-    fetchMemory()
+    fetchData()
   }, [memoryId])
+  
+  // Helper para encontrar el ID de un tag por su nombre
+  const getTagId = (tagName) => {
+    const tag = allTags.find(t => t.name === tagName)
+    return tag ? tag.id : null
+  }
 
   if (isLoading) {
     return (
@@ -159,7 +177,7 @@ function MemoriaDetalle() {
     )
   }
 
-  const isProcessed = memory.status === 'processed'
+  const isProcessed = memory.generated === true
 
   return (
     <div className="flex-1 flex flex-col px-6 py-6 overflow-y-auto">
@@ -185,10 +203,7 @@ function MemoriaDetalle() {
           {/* Info */}
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-2">
-              <h1 
-                className="text-white text-xl"
-                style={{ fontFamily: 'Syncopate, sans-serif', fontWeight: '600' }}
-              >
+              <h1 className="text-white text-2xl font-bold">
                 {memory.summary || memory.keyword}
               </h1>
               {isProcessed && (
@@ -212,24 +227,35 @@ function MemoriaDetalle() {
           </div>
         </div>
 
-        {/* Tags */}
+        {/* Categorías */}
         {memory.tags && memory.tags.length > 0 && (
           <div className="mb-8">
             <h2 
               className="text-white text-lg mb-3 lowercase"
               style={{ fontFamily: 'Syncopate, sans-serif', fontWeight: '600' }}
             >
-              tags
+              categorías
             </h2>
             <div className="flex flex-wrap gap-2">
-              {memory.tags.map((tag, index) => (
-                <span 
-                  key={index}
-                  className="bg-white/5 border border-white/10 text-gray-300 px-3 py-1.5 rounded-full text-sm"
-                >
-                  {tag}
-                </span>
-              ))}
+              {memory.tags.map((tag, index) => {
+                const tagId = getTagId(tag)
+                return tagId ? (
+                  <Link 
+                    key={index}
+                    to={`/categoria/${tagId}`}
+                    className="bg-white/5 border border-white/10 text-gray-300 px-3 py-1.5 rounded-full text-sm hover:bg-purple-500/20 hover:border-purple-500/30 hover:text-white transition-colors cursor-pointer"
+                  >
+                    {tag}
+                  </Link>
+                ) : (
+                  <span 
+                    key={index}
+                    className="bg-white/5 border border-white/10 text-gray-300 px-3 py-1.5 rounded-full text-sm"
+                  >
+                    {tag}
+                  </span>
+                )
+              })}
             </div>
           </div>
         )}
@@ -315,10 +341,9 @@ function MemoriaDetalle() {
           </h2>
           <div className="flex items-center gap-3">
             <div className={`w-3 h-3 rounded-full ${
-              memory.status === 'processed' ? 'bg-green-500' : 
-              memory.status === 'pending' ? 'bg-yellow-500' : 'bg-gray-500'
+              memory.generated ? 'bg-green-500' : 'bg-yellow-500'
             }`} />
-            <span className="text-gray-300 capitalize">{memory.status}</span>
+            <span className="text-gray-300">{memory.generated ? 'Procesado' : 'Pendiente'}</span>
           </div>
         </div>
 

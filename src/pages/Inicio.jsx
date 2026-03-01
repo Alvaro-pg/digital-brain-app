@@ -22,55 +22,81 @@ const getTimeAgo = (dateString) => {
   return `hace ${diffWeeks} semana${diffWeeks > 1 ? 's' : ''}`
 }
 
-const mockCategories = [
-  { id: 1, name: 'Informática FIC', slug: 'informatica-fic', type: 'code', image: null },
-  { id: 2, name: 'Música', slug: 'musica', type: 'spotify', image: null },
-  { id: 3, name: 'Memes', slug: 'memes', type: 'image', image: null },
-]
+const CATEGORY_CARD_WIDTH = 224 // 208px card + 16px gap
 
 function Inicio() {
   const [activeCategory, setActiveCategory] = useState('Inicio')
   const [memories, setMemories] = useState([])
+  const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
   const [filterCategories, setFilterCategories] = useState(['Inicio'])
+  const [categoryIndex, setCategoryIndex] = useState(0)
   const navigate = useNavigate()
 
-  // Cargar memorias del backend
+  // Navegación del carrusel de categorías
+  const canGoPrev = categoryIndex > 0
+  const canGoNext = categoryIndex < categories.length - 4
+
+  const handlePrevCategories = () => {
+    if (canGoPrev) setCategoryIndex(prev => Math.max(0, prev - 1))
+  }
+
+  const handleNextCategories = () => {
+    if (canGoNext) setCategoryIndex(prev => prev + 1)
+  }
+
+  // Cargar memorias y categorías del backend
   useEffect(() => {
-    const fetchMemories = async () => {
+    const fetchData = async () => {
       setLoading(true)
       try {
-        const response = await fetch('http://localhost:8000/memory/', {
-          headers: { 'Accept': 'application/json' }
-        })
-        if (!response.ok) throw new Error('Error al cargar memorias')
-        const data = await response.json()
+        const [memoriesRes, tagsRes] = await Promise.all([
+          fetch('http://localhost:8000/memory/', {
+            headers: { 'Accept': 'application/json' }
+          }),
+          fetch('http://localhost:8000/tag/', {
+            headers: { 'Accept': 'application/json' }
+          })
+        ])
+        
+        if (!memoriesRes.ok) throw new Error('Error al cargar memorias')
+        const memoriesData = await memoriesRes.json()
         
         // Mapear memorias al formato esperado
-        const mappedMemories = data.memories.map(memory => ({
+        const mappedMemories = memoriesData.memories.map(memory => ({
           id: memory.id,
           title: memory.summary || memory.keyword,
           category: memory.tags?.[0] || memory.type,
           subcategory: memory.keyword,
           timeAgo: getTimeAgo(memory.created_at),
+          createdAt: new Date(memory.created_at),
           image: null,
           type: memory.type === 'youtube' ? 'youtube' : memory.type === 'nota' ? 'pdf' : 'code',
-          isAIGenerated: memory.status === 'processed',
+          isAIGenerated: memory.generated === true,
           description: memory.raw_content
         }))
+        
+        // Ordenar de más nuevo a más viejo
+        mappedMemories.sort((a, b) => b.createdAt - a.createdAt)
         
         setMemories(mappedMemories)
         
         // Extraer categorías únicas para el filtro
         const uniqueCategories = ['Inicio', ...new Set(mappedMemories.map(m => m.category).filter(Boolean))]
         setFilterCategories(uniqueCategories)
+        
+        // Cargar categorías/tags
+        if (tagsRes.ok) {
+          const tagsData = await tagsRes.json()
+          setCategories(tagsData.tags || [])
+        }
       } catch (error) {
-        console.error('Error fetching memories:', error)
+        console.error('Error fetching data:', error)
       } finally {
         setLoading(false)
       }
     }
-    fetchMemories()
+    fetchData()
   }, [])
 
   // Filtrar insights según categoría activa
@@ -133,7 +159,7 @@ function Inicio() {
                 category={insight.subcategory}
                 timeAgo={insight.timeAgo}
                 type={insight.type}
-                isAIGenerated={insight.generated}
+                isAIGenerated={insight.isAIGenerated}
               />
             ))
           ) : (
@@ -200,22 +226,79 @@ function Inicio() {
 
       {/* Sección: Categorías */}
       <div>
-        <h2 
-          className="text-white text-xl mb-4 lowercase"
-          style={{ fontFamily: 'Syncopate, sans-serif', fontWeight: '600' }}
-        >
-          categorías
-        </h2>
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {mockCategories.map((category) => (
-            <CategoryCard
-              key={category.id}
-              image={category.image}
-              name={category.name}
-              slug={category.slug}
-              type={category.type}
-            />
-          ))}
+        <div className="flex items-center justify-between mb-4">
+          <h2 
+            className="text-white text-xl lowercase"
+            style={{ fontFamily: 'Syncopate, sans-serif', fontWeight: '600' }}
+          >
+            categorías
+          </h2>
+          <span
+            onClick={() => navigate('/categorias')}
+            className="text-white/40 hover:text-white/70 text-xs lowercase cursor-pointer transition-colors"
+            style={{ fontFamily: 'Syncopate, sans-serif', fontWeight: '600' }}
+          >
+            mostrar todos
+          </span>
+        </div>
+        <div className="flex items-center gap-4 pb-4">
+          {/* Flecha izquierda */}
+          <button
+            onClick={handlePrevCategories}
+            disabled={!canGoPrev}
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all flex-shrink-0 ${
+              canGoPrev 
+                ? 'bg-white/10 hover:bg-white/20 text-white cursor-pointer' 
+                : 'bg-white/5 text-white/20 cursor-not-allowed'
+            }`}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+
+          {/* Contenedor con overflow y animación */}
+          <div className="flex-1 overflow-hidden">
+            <div 
+              className="flex gap-4 transition-transform duration-300 ease-out"
+              style={{ transform: `translateX(-${categoryIndex * CATEGORY_CARD_WIDTH}px)` }}
+            >
+              {loading ? (
+                <div className="flex items-center justify-center w-full py-8">
+                  <OrbitSpinner size={40} />
+                </div>
+              ) : categories.length > 0 ? (
+                categories.map((category) => (
+                  <div key={category.id} className="flex-shrink-0">
+                    <CategoryCard
+                      id={category.id}
+                      image={null}
+                      name={category.name}
+                      slug={category.id.toString()}
+                      type="folder"
+                    />
+                  </div>
+                ))
+              ) : (
+                <p className="text-gray-400">No hay categorías disponibles</p>
+              )}
+            </div>
+          </div>
+
+          {/* Flecha derecha */}
+          <button
+            onClick={handleNextCategories}
+            disabled={!canGoNext}
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all flex-shrink-0 ${
+              canGoNext 
+                ? 'bg-white/10 hover:bg-white/20 text-white cursor-pointer' 
+                : 'bg-white/5 text-white/20 cursor-not-allowed'
+            }`}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
         </div>
       </div>
       </div>

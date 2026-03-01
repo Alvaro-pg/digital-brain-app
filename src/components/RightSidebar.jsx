@@ -5,25 +5,12 @@ import FunnelIcon from './FunnelIcon'
 import { brainService } from '../services/brainService'
 import { useDrag } from '../context/DragContext'
 
-const AI_MODELS = [
-  { id: 'gpt-4', name: 'GPT-4', provider: 'OpenAI' },
-  { id: 'gpt-3.5', name: 'GPT-3.5', provider: 'OpenAI' },
-  { id: 'claude-3', name: 'Claude 3', provider: 'Anthropic' },
-  { id: 'gemini-pro', name: 'Gemini Pro', provider: 'Google' },
-  { id: 'llama-3', name: 'Llama 3', provider: 'Meta' },
-]
-
 function RightSidebar() {
-  const [activeTab, setActiveTab] = useState('archivos')
+  const [activeTab] = useState('archivos')
   const [files, setFiles] = useState([])
   const [isDragging, setIsDragging] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [isPanelExpanded, setIsPanelExpanded] = useState(false)
-  const [messages, setMessages] = useState([])
-  const [inputMessage, setInputMessage] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const [selectedModel, setSelectedModel] = useState(AI_MODELS[0])
-  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false)
   const [isFunnelAnimating, setIsFunnelAnimating] = useState(false)
   const [filePrompt, setFilePrompt] = useState('')
   const [processingQueue, setProcessingQueue] = useState([]) // Cola de archivos en proceso
@@ -31,13 +18,14 @@ function RightSidebar() {
   const [categorySearch, setCategorySearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState(null)
   const [isCreatingCategory, setIsCreatingCategory] = useState(false)
+  const [isNoteExpanded, setIsNoteExpanded] = useState(false)
+  const [noteText, setNoteText] = useState('')
   const [categories, setCategories] = useState([])
   const [isLoadingCategories, setIsLoadingCategories] = useState(false)
   const fileInputRef = useRef(null)
-  const chatEndRef = useRef(null)
   const sidebarRef = useRef(null)
-  const modelDropdownRef = useRef(null)
   const categoryDropdownRef = useRef(null)
+  const noteInputRef = useRef(null)
 
   // Hook para drag & drop de insights
   const { droppedInsights, addDroppedInsight, removeDroppedInsight, clearDroppedInsights } = useDrag()
@@ -253,32 +241,6 @@ function RightSidebar() {
     removeDroppedInsight(id)
   }
 
-  const handleSendMessage = async () => {
-    if (!inputMessage.trim()) return
-    
-    const userMessage = { role: 'user', content: inputMessage }
-    setMessages(prev => [...prev, userMessage])
-    setInputMessage('')
-    setIsLoading(true)
-
-    // Simular respuesta de LLM (aquí se conectaría con una API externa)
-    setTimeout(() => {
-      const assistantMessage = { 
-        role: 'assistant', 
-        content: 'Esta es una respuesta simulada. Conecta con tu LLM preferida para obtener respuestas reales.' 
-      }
-      setMessages(prev => [...prev, assistantMessage])
-      setIsLoading(false)
-    }, 1500)
-  }
-
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSendMessage()
-    }
-  }
-
   const getFileIcon = (fileName) => {
     const ext = fileName.split('.').pop().toLowerCase()
     if (['pdf'].includes(ext)) {
@@ -386,30 +348,14 @@ function RightSidebar() {
 
       {/* Panel principal */}
       <div className="flex-1 flex flex-col p-4">
-      {/* Pestañas */}
+      {/* Título */}
       <div className="flex mb-4 bg-[#1a1744] rounded-xl p-1">
-        <button
-          onClick={() => setActiveTab('archivos')}
-          className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
-            activeTab === 'archivos'
-              ? 'bg-indigo-600 text-white'
-              : 'text-gray-400 hover:text-white'
-          }`}
+        <div
+          className="flex-1 py-2 px-3 rounded-lg text-sm font-medium bg-indigo-600 text-white text-center"
           style={{ fontFamily: 'Syncopate, sans-serif' }}
         >
           ARCHIVOS
-        </button>
-        <button
-          onClick={() => setActiveTab('chat')}
-          className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
-            activeTab === 'chat'
-              ? 'bg-indigo-600 text-white'
-              : 'text-gray-400 hover:text-white'
-          }`}
-          style={{ fontFamily: 'Syncopate, sans-serif' }}
-        >
-          CHAT
-        </button>
+        </div>
       </div>
 
       {/* Contenido de Archivos */}
@@ -435,6 +381,81 @@ function RightSidebar() {
             </button>
           )}
 
+          {/* Botón de nota rápida */}
+          <div className="mb-3">
+            <button
+              onClick={() => {
+                setIsNoteExpanded(!isNoteExpanded)
+                setTimeout(() => noteInputRef.current?.focus(), 100)
+              }}
+              className={`w-full bg-[#1a1744] border rounded-xl p-3 hover:border-gray-400 transition-all duration-300 flex items-center justify-center gap-2 ${
+                isNoteExpanded ? 'border-purple-500' : 'border-gray-600'
+              }`}
+            >
+              <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              <span className="text-gray-300 text-sm" style={{ fontFamily: 'Syncopate, sans-serif' }}>NOTA RÁPIDA</span>
+              <svg 
+                className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${isNoteExpanded ? 'rotate-180' : ''}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            
+            {/* Input de nota desplegable */}
+            <div className={`overflow-hidden transition-all duration-300 ${isNoteExpanded ? 'max-h-40 mt-2' : 'max-h-0'}`}>
+              <div className="relative">
+                <textarea
+                  ref={noteInputRef}
+                  value={noteText}
+                  onChange={(e) => setNoteText(e.target.value)}
+                  placeholder="Escribe tu nota aquí..."
+                  className="w-full bg-[#1a1744] border border-gray-600 rounded-xl p-3 pr-12 text-white text-sm resize-none focus:outline-none focus:border-purple-500 transition-colors"
+                  rows={3}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey && noteText.trim()) {
+                      e.preventDefault()
+                      // Crear archivo de texto con la nota
+                      const noteBlob = new Blob([noteText], { type: 'text/plain' })
+                      const noteFile = new File([noteBlob], `nota_${Date.now()}.txt`, { type: 'text/plain' })
+                      setFiles(prev => [...prev, noteFile])
+                      setNoteText('')
+                      setIsNoteExpanded(false)
+                      toast.success('Nota añadida al embudo')
+                    }
+                  }}
+                />
+                <button
+                  onClick={() => {
+                    if (noteText.trim()) {
+                      const noteBlob = new Blob([noteText], { type: 'text/plain' })
+                      const noteFile = new File([noteBlob], `nota_${Date.now()}.txt`, { type: 'text/plain' })
+                      setFiles(prev => [...prev, noteFile])
+                      setNoteText('')
+                      setIsNoteExpanded(false)
+                      toast.success('Nota añadida al embudo')
+                    }
+                  }}
+                  disabled={!noteText.trim()}
+                  className={`absolute right-2 bottom-2 p-2 rounded-lg transition-colors ${
+                    noteText.trim() 
+                      ? 'bg-purple-600 hover:bg-purple-700 text-white cursor-pointer' 
+                      : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
           {/* Área de drop */}
           <div
             onClick={handleClick}
@@ -449,7 +470,7 @@ function RightSidebar() {
           >
             <div className="flex flex-col items-center gap-3">
               <FunnelIcon size={120} isAnimating={isFunnelAnimating} isDragging={isDragging} />
-              <p className="text-gray-400 text-sm text-center" style={{ fontFamily: 'Syncopate, sans-serif' }}>
+              <p className="text-gray-400 text-sm text-center" style={{ fontFamily: 'Syncopate, sans-serif', fontWeight: '600' }}>
                 {files.length > 0 
                   ? `${files.length} archivo${files.length > 1 ? 's' : ''}`
                   : 'Arrastra información aquí'
@@ -689,120 +710,6 @@ function RightSidebar() {
           {/* Info */}
           <div className="text-gray-500 text-sm text-center mt-4">
             <p>Formatos: PDF, TXT, MD, IMG</p>
-          </div>
-        </div>
-      )}
-
-      {/* Contenido de Chat */}
-      {activeTab === 'chat' && (
-        <div className="flex flex-col flex-1">
-          {/* Selector de modelo */}
-          <div className="mb-4 relative" ref={modelDropdownRef}>
-            <button
-              onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
-              className="w-full bg-[#1a1744] border border-gray-600 rounded-xl p-3 flex items-center justify-between hover:border-gray-400 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-                <div className="flex flex-col items-start">
-                  <span className="text-white text-sm">{selectedModel.name}</span>
-                  <span className="text-gray-500 text-xs">{selectedModel.provider}</span>
-                </div>
-              </div>
-              <svg className={`w-4 h-4 text-gray-400 transition-transform ${isModelDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            
-            {/* Dropdown de modelos */}
-            {isModelDropdownOpen && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a1744] border border-gray-600 rounded-xl overflow-hidden z-10">
-                {AI_MODELS.map((model) => (
-                  <button
-                    key={model.id}
-                    onClick={() => {
-                      setSelectedModel(model)
-                      setIsModelDropdownOpen(false)
-                    }}
-                    className={`w-full p-3 flex items-center gap-3 hover:bg-[#252250] transition-colors ${
-                      selectedModel.id === model.id ? 'bg-[#252250]' : ''
-                    }`}
-                  >
-                    {selectedModel.id === model.id && (
-                      <svg className="w-4 h-4 text-purple-400" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-                      </svg>
-                    )}
-                    <div className={`flex flex-col items-start ${selectedModel.id !== model.id ? 'ml-7' : ''}`}>
-                      <span className="text-white text-sm">{model.name}</span>
-                      <span className="text-gray-500 text-xs">{model.provider}</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Mensajes */}
-          <div className="flex-1 bg-[#1a1744] rounded-xl p-3 mb-4 overflow-y-auto max-h-[calc(100vh-250px)]">
-            {messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-gray-500">
-                <svg className="w-12 h-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} 
-                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
-                <p className="text-sm text-center">Aquí puedo hacer tareas que tú me indiques</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {messages.map((msg, index) => (
-                  <div
-                    key={index}
-                    className={`p-3 rounded-lg text-sm ${
-                      msg.role === 'user'
-                        ? 'bg-indigo-600 text-white ml-4'
-                        : 'bg-[#252250] text-gray-300 mr-4'
-                    }`}
-                  >
-                    {msg.content}
-                  </div>
-                ))}
-                {isLoading && (
-                  <div className="bg-[#252250] text-gray-300 mr-4 p-3 rounded-lg text-sm flex items-center gap-2">
-                    <OrbitSpinner size={20} />
-                    Pensando...
-                  </div>
-                )}
-                <div ref={chatEndRef} />
-              </div>
-            )}
-          </div>
-
-          {/* Input de mensaje */}
-          <div className="flex gap-2">
-            <textarea
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Escribe tu mensaje..."
-              className="flex-1 bg-[#1a1744] border border-gray-600 rounded-xl p-3 text-white text-sm resize-none focus:outline-none focus:border-indigo-500"
-              rows={2}
-            />
-            <button
-              onClick={handleSendMessage}
-              disabled={!inputMessage.trim() || isLoading}
-              className={`px-4 rounded-xl transition-all ${
-                inputMessage.trim() && !isLoading
-                  ? 'bg-indigo-600 hover:bg-indigo-500 text-white'
-                  : 'bg-gray-700 text-gray-500 cursor-not-allowed'
-              }`}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-              </svg>
-            </button>
           </div>
         </div>
       )}

@@ -1,54 +1,77 @@
-function OrbitSpinner({ size = 80, className = '' }) {
+function OrbitSpinner({ size = 80, className = '', fadeIn = false }) {
+  // Combinamos la animación de rotación con fadeIn si está activo
+  // La rotación siempre está presente, fadeIn se añade opcionalmente
+  const getAnimationStyle = (rotationAnim, delay) => {
+    if (!fadeIn) return {}
+    return {
+      animation: `${rotationAnim}, orbitFadeIn 1s ease-out ${delay}s forwards`,
+      opacity: 0,
+    }
+  }
+
   return (
-    <div 
-      className={`relative ${className}`}
-      style={{ width: size, height: size }}
-    >
-      {/* Elipse grande - rotación lenta */}
-      <svg 
-        className="absolute top-1/2 left-1/2 orbit-slow"
-        width={size * 0.4}
-        height={size}
-        viewBox="0 0 27 65" 
-        fill="none"
+    <>
+      {fadeIn && (
+        <style>{`
+          @keyframes orbitFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+        `}</style>
+      )}
+      <div 
+        className={`relative ${className}`}
+        style={{ width: size, height: size }}
       >
-        <path 
-          d="M13.5 1C15.0145 1 16.5483 1.73491 18.041 3.25488C19.5371 4.77826 20.9306 7.03398 22.1221 9.90234C24.5033 15.635 26 23.6241 26 32.5C26 41.3759 24.5033 49.365 22.1221 55.0977C20.9306 57.966 19.5371 60.2217 18.041 61.7451C16.5483 63.2651 15.0145 64 13.5 64C11.9855 64 10.4517 63.2651 8.95898 61.7451C7.4629 60.2217 6.06944 57.966 4.87793 55.0977C2.49669 49.365 1 41.3759 1 32.5C1 23.6241 2.49669 15.635 4.87793 9.90234C6.06944 7.03398 7.4629 4.77826 8.95898 3.25488C10.4517 1.73491 11.9855 1 13.5 1Z" 
-          stroke="white"
-          strokeWidth="2"
-        />
-      </svg>
+        {/* Elipse grande - rotación lenta */}
+        <svg 
+          className={`absolute top-1/2 left-1/2 ${!fadeIn ? 'orbit-slow' : ''}`}
+          width={size * 0.4}
+          height={size}
+          viewBox="0 0 27 65" 
+          fill="none"
+          style={getAnimationStyle('orbit-slow 1.5s linear infinite', 2)}
+        >
+          <path 
+            d="M13.5 1C15.0145 1 16.5483 1.73491 18.041 3.25488C19.5371 4.77826 20.9306 7.03398 22.1221 9.90234C24.5033 15.635 26 23.6241 26 32.5C26 41.3759 24.5033 49.365 22.1221 55.0977C20.9306 57.966 19.5371 60.2217 18.041 61.7451C16.5483 63.2651 15.0145 64 13.5 64C11.9855 64 10.4517 63.2651 8.95898 61.7451C7.4629 60.2217 6.06944 57.966 4.87793 55.0977C2.49669 49.365 1 41.3759 1 32.5C1 23.6241 2.49669 15.635 4.87793 9.90234C6.06944 7.03398 7.4629 4.77826 8.95898 3.25488C10.4517 1.73491 11.9855 1 13.5 1Z" 
+            stroke="white"
+            strokeWidth="2"
+          />
+        </svg>
 
-      {/* Elipse mediana - rotación media, dirección opuesta */}
-      <svg 
-        className="absolute top-1/2 left-1/2 orbit-medium"
-        width={size * 0.32}
-        height={size * 0.78}
-        viewBox="0 0 21 51" 
-        fill="none"
-      >
-        <path 
-          d="M10.5 1C11.5969 1 12.7354 1.53569 13.8701 2.70117C15.0081 3.87007 16.0794 5.61389 17 7.84961C18.8392 12.3163 20 18.5562 20 25.5C20 32.4438 18.8392 38.6837 17 43.1504C16.0794 45.3861 15.0081 47.1299 13.8701 48.2988C12.7354 49.4643 11.5969 50 10.5 50C9.40308 50 8.26464 49.4643 7.12988 48.2988C5.99193 47.1299 4.92059 45.3861 4 43.1504C2.16078 38.6837 1 32.4438 1 25.5C1 18.5562 2.16078 12.3163 4 7.84961C4.92059 5.61389 5.99193 3.87007 7.12988 2.70117C8.26464 1.53569 9.40308 1 10.5 1Z" 
-          stroke="white"
-          strokeWidth="2"
-        />
-      </svg>
+        {/* Elipse mediana - rotación media, dirección opuesta */}
+        <svg 
+          className={`absolute top-1/2 left-1/2 ${!fadeIn ? 'orbit-medium' : ''}`}
+          width={size * 0.32}
+          height={size * 0.78}
+          viewBox="0 0 21 51" 
+          fill="none"
+          style={getAnimationStyle('orbit-medium 1.35s linear infinite', 1)}
+        >
+          <path 
+            d="M10.5 1C11.5969 1 12.7354 1.53569 13.8701 2.70117C15.0081 3.87007 16.0794 5.61389 17 7.84961C18.8392 12.3163 20 18.5562 20 25.5C20 32.4438 18.8392 38.6837 17 43.1504C16.0794 45.3861 15.0081 47.1299 13.8701 48.2988C12.7354 49.4643 11.5969 50 10.5 50C9.40308 50 8.26464 49.4643 7.12988 48.2988C5.99193 47.1299 4.92059 45.3861 4 43.1504C2.16078 38.6837 1 32.4438 1 25.5C1 18.5562 2.16078 12.3163 4 7.84961C4.92059 5.61389 5.99193 3.87007 7.12988 2.70117C8.26464 1.53569 9.40308 1 10.5 1Z" 
+            stroke="white"
+            strokeWidth="2"
+          />
+        </svg>
 
-      {/* Elipse pequeña - rotación rápida */}
-      <svg 
-        className="absolute top-1/2 left-1/2 orbit-fast"
-        width={size * 0.22}
-        height={size * 0.52}
-        viewBox="0 0 14 34" 
-        fill="none"
-      >
-        <path 
-          d="M7 1C7.61369 1 8.2918 1.29783 9.00781 2.0332C9.72703 2.77198 10.4215 3.89373 11.0254 5.36035C12.2311 8.28886 13 12.4036 13 17C13 21.5964 12.2311 25.7111 11.0254 28.6396C10.4215 30.1063 9.72703 31.228 9.00781 31.9668C8.2918 32.7022 7.61369 33 7 33C6.38631 33 5.7082 32.7022 4.99219 31.9668C4.27297 31.228 3.57851 30.1063 2.97461 28.6396C1.76885 25.7111 1 21.5964 1 17C1 12.4036 1.76885 8.28886 2.97461 5.36035C3.57851 3.89373 4.27297 2.77198 4.99219 2.0332C5.7082 1.29783 6.38631 1 7 1Z" 
-          stroke="white"
-          strokeWidth="2"
-        />
-      </svg>
-    </div>
+        {/* Elipse pequeña - rotación rápida */}
+        <svg 
+          className={`absolute top-1/2 left-1/2 ${!fadeIn ? 'orbit-fast' : ''}`}
+          width={size * 0.22}
+          height={size * 0.52}
+          viewBox="0 0 14 34" 
+          fill="none"
+          style={getAnimationStyle('orbit-fast 1.2s linear infinite', 0)}
+        >
+          <path 
+            d="M7 1C7.61369 1 8.2918 1.29783 9.00781 2.0332C9.72703 2.77198 10.4215 3.89373 11.0254 5.36035C12.2311 8.28886 13 12.4036 13 17C13 21.5964 12.2311 25.7111 11.0254 28.6396C10.4215 30.1063 9.72703 31.228 9.00781 31.9668C8.2918 32.7022 7.61369 33 7 33C6.38631 33 5.7082 32.7022 4.99219 31.9668C4.27297 31.228 3.57851 30.1063 2.97461 28.6396C1.76885 25.7111 1 21.5964 1 17C1 12.4036 1.76885 8.28886 2.97461 5.36035C3.57851 3.89373 4.27297 2.77198 4.99219 2.0332C5.7082 1.29783 6.38631 1 7 1Z" 
+            stroke="white"
+            strokeWidth="2"
+          />
+        </svg>
+      </div>
+    </>
   )
 }
 
