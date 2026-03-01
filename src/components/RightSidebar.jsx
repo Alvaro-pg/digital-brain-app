@@ -115,6 +115,9 @@ function RightSidebar() {
         
         console.log('Brain response:', response)
         
+        // Avisar a la aplicación (ej. Graficos.jsx) que hay nodos nuevos
+        window.dispatchEvent(new CustomEvent('brain:updated'))
+        
         // Actualizamos estado a éxito en la cola
         setProcessingQueue(prev => prev.map(item => 
           newItems.find(ni => ni.id === item.id) ? { ...item, status: 'success' } : item

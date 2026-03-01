@@ -285,11 +285,19 @@ function Graficos() {
 
     initChart()
 
+    // Escuchar evento global de actualización de memoria
+    const handleBrainUpdate = () => {
+      console.log('Evento brain:updated recibido. Recargando grafo...')
+      initChart()
+    }
+    window.addEventListener('brain:updated', handleBrainUpdate)
+
     const handleResize = () => chartInstance.current?.resize()
     window.addEventListener('resize', handleResize)
 
     return () => {
       window.removeEventListener('resize', handleResize)
+      window.removeEventListener('brain:updated', handleBrainUpdate)
       if (chartInstance.current) {
         chartInstance.current.dispose()
         chartInstance.current = null
