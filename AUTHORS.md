@@ -1,4 +1,4 @@
-# Authors
+# Authors – Digital Brain Team
 
 Digital Brain was created at **HackUDC 2026** by the following contributors:
 
