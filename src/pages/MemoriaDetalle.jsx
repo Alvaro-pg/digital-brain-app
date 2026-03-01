@@ -39,7 +39,10 @@ const renderFilePreview = (url) => {
     return <video controls src={fullUrl} className="w-full max-h-[500px] rounded-xl shadow-lg border border-[#6366f1]/20 bg-black/20" />;
   }
   if (['pdf'].includes(ext)) {
-    return <iframe src={fullUrl} className="w-full h-[600px] rounded-xl shadow-lg border border-[#6366f1]/20 bg-white" title="PDF Preview" />;
+    return <iframe src={fullUrl} className="w-full h-[500px] rounded-xl shadow-lg border border-[#6366f1]/20 bg-white" title="Document Preview" />;
+  }
+  if(['txt', 'md'].includes(ext)) {
+      return <iframe src={fullUrl} className="w-full h-[200px] rounded-xl shadow-lg border border-[#6366f1]/20 bg-white" title="Document Preview" />;
   }
   
   // Archivo genérico (Solo botón)
