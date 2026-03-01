@@ -45,6 +45,19 @@ const renderFilePreview = (url) => {
       return <iframe src={fullUrl} className="w-full h-[200px] rounded-xl shadow-lg border border-[#6366f1]/20 bg-white" title="Document Preview" />;
   }
   
+if ([
+  'js','ts','jsx','tsx','json','py','java','c','cpp',
+  'cs','php','rb','go','rs','html','css','scss','sql'
+].includes(ext)) {
+  return (
+    <iframe
+      src={fullUrl}
+      className="w-full h-[200px] rounded-xl shadow-lg border border-[#6366f1]/20 bg-white"
+      title="Code Preview"
+    />
+  );  
+}
+  
   // Archivo genérico (Solo botón)
   return (
     <div className="bg-[#1a1744] border border-gray-700 p-8 rounded-xl text-center">
