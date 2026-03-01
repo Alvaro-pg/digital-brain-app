@@ -1,19 +1,26 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import InsightCard from '../components/InsightCard'
 import CategoryCard from '../components/CategoryCard'
 import CategoryFilter from '../components/CategoryFilter'
 import DynamicCalendar from '../components/DynamicCalendar'
+import OrbitSpinner from '../components/OrbitSpinner'
 
-// Datos mockeados
-const mockInsights = [
-  { id: 1, title: 'Kemba Kalwer', category: 'Música', subcategory: 'eladiocarrionofficial', timeAgo: 'hace 1 hora', image: null, type: 'spotify', isAIGenerated: false },
-  { id: 2, title: 'Bad Bunny - Monaco', category: 'Música', subcategory: 'badbunny', timeAgo: 'hace 5 horas', image: null, type: 'youtube', isAIGenerated: false },
-  { id: 3, title: 'Conexión: Grafos y Algoritmos de Dijkstra', category: 'Informática', subcategory: 'Informática FIC', timeAgo: 'hace 2 días', image: null, type: 'code', isAIGenerated: true, description: 'Tu brain detectó una conexión entre tus apuntes de matemáticas discretas y el algoritmo de Dijkstra que estudiaste la semana pasada.' },
-  { id: 4, title: 'Estructuras de Datos', category: 'Informática', subcategory: 'Algoritmos', timeAgo: 'hace 4 días', image: null, type: 'pdf', isAIGenerated: false },
-  { id: 5, title: 'Resumen: Patrones REST en tus apuntes', category: 'Desarrollo Backend', subcategory: 'Node.js', timeAgo: 'hace 3 días', image: null, type: 'code', isAIGenerated: true, description: 'Resumen automático generado a partir de tus notas sobre APIs RESTful, Express.js y buenas prácticas de desarrollo backend.' },
-  { id: 6, title: 'PostgreSQL Avanzado', category: 'Desarrollo Backend', subcategory: 'Bases de Datos', timeAgo: 'hace 1 semana', image: null, type: 'code', isAIGenerated: false },
-  { id: 7, title: 'Docker Compose', category: 'Desarrollo Backend', subcategory: 'DevOps', timeAgo: 'hace 2 semanas', image: null, type: 'code', isAIGenerated: false },
-]
+// Helper para calcular tiempo relativo
+const getTimeAgo = (dateString) => {
+  const now = new Date()
+  const date = new Date(dateString)
+  const diffMs = now - date
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+  const diffWeeks = Math.floor(diffDays / 7)
+  
+  if (diffMins < 60) return `hace ${diffMins} min`
+  if (diffHours < 24) return `hace ${diffHours} hora${diffHours > 1 ? 's' : ''}`
+  if (diffDays < 7) return `hace ${diffDays} día${diffDays > 1 ? 's' : ''}`
+  return `hace ${diffWeeks} semana${diffWeeks > 1 ? 's' : ''}`
+}
 
 const mockCategories = [
   { id: 1, name: 'Informática FIC', slug: 'informatica-fic', type: 'code', image: null },
@@ -21,18 +28,58 @@ const mockCategories = [
   { id: 3, name: 'Memes', slug: 'memes', type: 'image', image: null },
 ]
 
-const filterCategories = ['Inicio', 'Música', 'Desarrollo Backend', 'Informática']
-
 function Inicio() {
   const [activeCategory, setActiveCategory] = useState('Inicio')
+  const [memories, setMemories] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [filterCategories, setFilterCategories] = useState(['Inicio'])
+  const navigate = useNavigate()
+
+  // Cargar memorias del backend
+  useEffect(() => {
+    const fetchMemories = async () => {
+      setLoading(true)
+      try {
+        const response = await fetch('http://localhost:8000/memory/', {
+          headers: { 'Accept': 'application/json' }
+        })
+        if (!response.ok) throw new Error('Error al cargar memorias')
+        const data = await response.json()
+        
+        // Mapear memorias al formato esperado
+        const mappedMemories = data.memories.map(memory => ({
+          id: memory.id,
+          title: memory.summary || memory.keyword,
+          category: memory.tags?.[0] || memory.type,
+          subcategory: memory.keyword,
+          timeAgo: getTimeAgo(memory.created_at),
+          image: null,
+          type: memory.type === 'youtube' ? 'youtube' : memory.type === 'nota' ? 'pdf' : 'code',
+          isAIGenerated: memory.status === 'processed',
+          description: memory.raw_content
+        }))
+        
+        setMemories(mappedMemories)
+        
+        // Extraer categorías únicas para el filtro
+        const uniqueCategories = ['Inicio', ...new Set(mappedMemories.map(m => m.category).filter(Boolean))]
+        setFilterCategories(uniqueCategories)
+      } catch (error) {
+        console.error('Error fetching memories:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchMemories()
+  }, [])
 
   // Filtrar insights según categoría activa
   const filteredInsights = activeCategory === 'Inicio'
-    ? mockInsights
-    : mockInsights.filter(insight => insight.category === activeCategory)
+    ? memories
+    : memories.filter(insight => insight.category === activeCategory)
 
   // Filtrar solo los insights generados por el brain
-  const brainInsights = mockInsights.filter(insight => insight.isAIGenerated)
+  const brainInsights = memories.filter(insight => insight.isAIGenerated)
 
   return (
     <div className="flex-1 flex flex-col px-6 py-6 overflow-y-auto">
@@ -54,23 +101,39 @@ function Inicio() {
       )}
       {/* Sección: Últimos Insights */}
       <div className="mb-8 mt-10">
-        <h2 
-          className="text-white text-xl mb-4 lowercase"
-          style={{ fontFamily: 'Syncopate, sans-serif', fontWeight: '600' }}
-        >
-          {activeCategory === 'Inicio' ? 'vuelve a tus últimas memorias' : `insights de ${activeCategory.toLowerCase()}`}
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 
+            className="text-white text-xl lowercase"
+            style={{ fontFamily: 'Syncopate, sans-serif', fontWeight: '600' }}
+          >
+            {activeCategory === 'Inicio' ? 'vuelve a tus últimas memorias' : `insights de ${activeCategory.toLowerCase()}`}
+          </h2>
+          {activeCategory === 'Inicio' && (
+            <span
+              onClick={() => navigate('/memorias')}
+              className="text-white/40 hover:text-white/70 text-xs lowercase cursor-pointer transition-colors"
+              style={{ fontFamily: 'Syncopate, sans-serif', fontWeight: '600' }}
+            >
+              mostrar todos
+            </span>
+          )}
+        </div>
         <div className="flex gap-6 overflow-x-auto pb-4">
-          {filteredInsights.length > 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center w-full py-8">
+              <OrbitSpinner size={40} />
+            </div>
+          ) : filteredInsights.length > 0 ? (
             filteredInsights.map((insight) => (
               <InsightCard
                 key={insight.id}
+                id={insight.id}
                 image={insight.image}
                 title={insight.title}
                 category={insight.subcategory}
                 timeAgo={insight.timeAgo}
                 type={insight.type}
-                isAIGenerated={insight.isAIGenerated}
+                isAIGenerated={insight.generated}
               />
             ))
           ) : (
@@ -88,10 +151,15 @@ function Inicio() {
           generado por tu brain
         </h2>
         <div className="flex flex-col gap-3">
-          {brainInsights.length > 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center w-full py-8">
+              <OrbitSpinner size={40} />
+            </div>
+          ) : brainInsights.length > 0 ? (
             brainInsights.map((insight) => (
               <div 
                 key={insight.id}
+                onClick={() => navigate(`/memoria/${insight.id}`)}
                 className="w-full flex items-center gap-4 p-4 rounded-xl border border-purple-500/30 bg-gradient-to-r from-purple-900/20 via-[#1a1744] to-pink-900/10 hover:border-purple-500/50 transition-all cursor-pointer group"
               >
                 {/* Icono con gradiente */}

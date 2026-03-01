@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import * as echarts from 'echarts'
 import 'echarts-gl'
 import { graphService } from '../services/graphService'
@@ -97,6 +98,7 @@ const transformDataForECharts = (backendData) => {
 function Graficos() {
   const chartRef = useRef(null)
   const chartInstance = useRef(null)
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [isEmpty, setIsEmpty] = useState(false)
@@ -384,7 +386,8 @@ function Graficos() {
                 {memories.map((memo, idx) => (
                   <div 
                     key={idx} 
-                    className="bg-white/5 border border-white/10 p-4 rounded-xl hover:bg-white/10 transition-all group"
+                    onClick={() => navigate(`/memoria/${memo.id}`)}
+                    className="bg-white/5 border border-white/10 p-4 rounded-xl hover:bg-white/10 hover:border-[#6366f1]/50 transition-all group cursor-pointer"
                   >
                     <div className="flex justify-between items-start mb-2">
                       <span className="text-[10px] uppercase tracking-widest text-[#6366f1] font-bold">{memo.type}</span>

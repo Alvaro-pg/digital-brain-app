@@ -6,11 +6,15 @@ function Header() {
     `text-white hover:text-gray-300 text-lg tracking-wider ${isActive ? 'border-b-2 border-white' : ''}`
 
   return (
-    <header className="w-full py-4 px-6 flex items-center bg-gradient-to-b from-[#090816] to-transparent">
+    <header className="w-full py-4 px-6 flex flex-col items-center bg-gradient-to-b from-[#090816] to-transparent">
       <NavLink to="/">
-        <img src={digitalBrainLogo} alt="Digital Brain" className="h-14 mr-8" />
+        <img 
+          src={digitalBrainLogo} 
+          alt="Digital Brain" 
+          style={{ height: 'auto', width: '30px' }} 
+        />
       </NavLink>
-      <nav className="flex gap-8 flex-1 justify-center" style={{ fontFamily: 'Syncopate, sans-serif' }}>
+      <nav className="flex gap-8 mt-4" style={{ fontFamily: 'Syncopate, sans-serif' }}>
         <NavLink to="/" className={linkClass}>INICIO</NavLink>
         <NavLink to="/categorias" className={linkClass}>CATEGORÍAS</NavLink>
         <NavLink to="/graficos" className={linkClass}>GRÁFICOS</NavLink>

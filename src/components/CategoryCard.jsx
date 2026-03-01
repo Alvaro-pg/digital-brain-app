@@ -62,9 +62,9 @@ const getIconByType = (type) => {
   }
 }
 
-function CategoryCard({ image, name, color = '#1a1744', slug, type = 'folder' }) {
+function CategoryCard({ image, name, color = '#1a1744', id, type = 'folder' }) {
   return (
-    <Link to={`/categoria/${slug}`} className="flex flex-col gap-3 cursor-pointer group">
+    <Link to={`/categoria/${id}`} className="flex flex-col gap-3 cursor-pointer group">
       {/* Imagen de categoría */}
       <div 
         className="w-52 h-64 rounded-xl overflow-hidden border border-gray-600 group-hover:border-gray-400 transition-colors"

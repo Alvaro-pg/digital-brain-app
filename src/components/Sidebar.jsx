@@ -12,8 +12,12 @@ function Sidebar() {
   return (
     <aside className="w-72 min-h-screen bg-[#0f0d24] flex flex-col p-4">
       {/* Logo */}
-      <NavLink to="/" className="mb-8">
-        <img src={digitalBrainLogo} alt="Digital Brain" className="h-12" />
+      <NavLink to="/" className="mb-8 flex justify-center">
+        <img 
+          src={digitalBrainLogo} 
+          alt="Digital Brain" 
+          style={{ height: '60px', width: 'auto' }} 
+        />
       </NavLink>
 
       {/* Navegación */}

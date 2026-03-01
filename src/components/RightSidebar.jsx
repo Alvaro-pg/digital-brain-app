@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
+import toast from 'react-hot-toast'
 import OrbitSpinner from './OrbitSpinner'
 import FunnelIcon from './FunnelIcon'
 import { brainService } from '../services/brainService'
+import { useDrag } from '../context/DragContext'
 
 const AI_MODELS = [
   { id: 'gpt-4', name: 'GPT-4', provider: 'OpenAI' },
@@ -25,14 +27,92 @@ function RightSidebar() {
   const [isFunnelAnimating, setIsFunnelAnimating] = useState(false)
   const [filePrompt, setFilePrompt] = useState('')
   const [processingQueue, setProcessingQueue] = useState([]) // Cola de archivos en proceso
+  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false)
+  const [categorySearch, setCategorySearch] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState(null)
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false)
+  const [categories, setCategories] = useState([])
+  const [isLoadingCategories, setIsLoadingCategories] = useState(false)
   const fileInputRef = useRef(null)
   const chatEndRef = useRef(null)
   const sidebarRef = useRef(null)
   const modelDropdownRef = useRef(null)
+  const categoryDropdownRef = useRef(null)
 
-  // Expandir panel cuando hay archivos nuevos
+  // Hook para drag & drop de insights
+  const { droppedInsights, addDroppedInsight, removeDroppedInsight, clearDroppedInsights } = useDrag()
+
+  // Cargar categorías del backend al montar
   useEffect(() => {
-    if (files.length > 0) {
+    const fetchCategories = async () => {
+      setIsLoadingCategories(true)
+      try {
+        const response = await fetch('http://localhost:8000/tag/', {
+          headers: { 'Accept': 'application/json' }
+        })
+        if (!response.ok) throw new Error('Error al cargar categorías')
+        const data = await response.json()
+        const mappedCategories = data.tags.map(tag => ({
+          id: tag.id,
+          name: tag.name,
+          slug: tag.name.toLowerCase().replace(/\s+/g, '-'),
+          type: 'custom'
+        }))
+        setCategories(mappedCategories)
+      } catch (error) {
+        console.error('Error fetching categories:', error)
+      } finally {
+        setIsLoadingCategories(false)
+      }
+    }
+    fetchCategories()
+  }, [])
+
+  // Filtrar categorías por búsqueda
+  const filteredCategories = categories.filter(cat =>
+    cat.name.toLowerCase().includes(categorySearch.toLowerCase())
+  )
+
+  // Crear nueva categoría (tag) en el backend
+  const handleCreateCategory = async () => {
+    if (!categorySearch.trim() || isCreatingCategory) return
+    
+    setIsCreatingCategory(true)
+    try {
+      const response = await fetch('http://localhost:8000/tag/create', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: categorySearch.trim() })
+      })
+      
+      if (!response.ok) throw new Error('Error al crear categoría')
+      
+      const data = await response.json()
+      const newCategory = {
+        id: data.tag.id,
+        name: data.tag.name,
+        slug: data.tag.name.toLowerCase().replace(/\s+/g, '-'),
+        type: 'custom'
+      }
+      
+      setCategories(prev => [...prev, newCategory])
+      setSelectedCategory(newCategory)
+      setCategorySearch('')
+      toast.success(`Categoría "${newCategory.name}" creada`)
+    } catch (error) {
+      console.error('Error creating category:', error)
+      toast.error('Error al crear la categoría')
+    } finally {
+      setIsCreatingCategory(false)
+    }
+  }
+
+  // Expandir panel cuando hay archivos nuevos o insights
+  useEffect(() => {
+    if (files.length > 0 || droppedInsights.length > 0) {
       setIsPanelExpanded(true)
     }
   }, [files.length])
@@ -46,6 +126,10 @@ function RightSidebar() {
       // Cerrar dropdown de modelos
       if (modelDropdownRef.current && !modelDropdownRef.current.contains(event.target)) {
         setIsModelDropdownOpen(false)
+      }
+      // Cerrar dropdown de categorías
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target)) {
+        setIsCategoryDropdownOpen(false)
       }
     }
 
@@ -68,6 +152,22 @@ function RightSidebar() {
   const handleDrop = (e) => {
     e.preventDefault()
     setIsDragging(false)
+    
+    // Verificar si es un insight arrastrado
+    const insightData = e.dataTransfer.getData('application/json')
+    if (insightData) {
+      try {
+        const insight = JSON.parse(insightData)
+        addDroppedInsight(insight)
+        setIsFunnelAnimating(true)
+        setTimeout(() => setIsFunnelAnimating(false), 700)
+        return
+      } catch (err) {
+        // No es JSON válido, continuar con archivos
+      }
+    }
+    
+    // Es un archivo
     const droppedFiles = Array.from(e.dataTransfer.files)
     setFiles((prev) => [...prev, ...droppedFiles])
     // Trigger funnel animation
@@ -103,6 +203,7 @@ function RightSidebar() {
       setProcessingQueue(prev => [...prev, ...newItems])
       setFiles([]) // Limpiamos el área de drop
       setFilePrompt('')
+      clearDroppedInsights()
       
       setIsProcessing(true)
       try {
@@ -130,11 +231,14 @@ function RightSidebar() {
           ))
         }, 5000)
         
+        toast.success(`¡${filesToProcess.length} archivo${filesToProcess.length > 1 ? 's' : ''} procesado${filesToProcess.length > 1 ? 's' : ''} correctamente!`)
+        
       } catch (err) {
         console.error('Error al procesar archivos:', err)
         setProcessingQueue(prev => prev.map(item => 
           newItems.find(ni => ni.id === item.id) ? { ...item, status: 'error' } : item
         ))
+        toast.error('Error al procesar archivos')
       } finally {
         setIsProcessing(false)
       }
@@ -143,6 +247,10 @@ function RightSidebar() {
 
   const removeFile = (index) => {
     setFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const removeInsight = (id) => {
+    removeDroppedInsight(id)
   }
 
   const handleSendMessage = async () => {
@@ -205,7 +313,8 @@ function RightSidebar() {
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
   }
 
-  const hasFiles = files.length > 0
+  const hasFiles = files.length > 0 || droppedInsights.length > 0
+  const totalItems = files.length + droppedInsights.length
   const showExpandedPanel = hasFiles && isPanelExpanded && !isProcessing
 
   return (
@@ -222,9 +331,35 @@ function RightSidebar() {
             className="text-white text-sm mb-4 uppercase tracking-wider"
             style={{ fontFamily: 'Syncopate, sans-serif' }}
           >
-            Archivos listos
+            Listos para procesar
           </h3>
           <div className="flex-1 overflow-y-auto space-y-3">
+            {/* Insights arrastrados */}
+            {droppedInsights.map((insight) => (
+              <div 
+                key={`insight-${insight.id}`} 
+                className="bg-gradient-to-br from-purple-900/30 to-pink-900/20 border border-purple-500/30 rounded-xl p-3 relative group hover:border-purple-500/50 transition-all"
+              >
+                <button 
+                  onClick={() => removeInsight(insight.id)}
+                  className="absolute top-2 right-2 text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center mb-2">
+                    <svg className="w-5 h-5 text-purple-400" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2L9.19 8.63L2 9.24l5.46 4.73L5.82 21L12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2z"/>
+                    </svg>
+                  </div>
+                  <span className="text-purple-300 text-xs truncate w-full">{insight.title}</span>
+                  <span className="text-gray-500 text-xs mt-1">insight</span>
+                </div>
+              </div>
+            ))}
+            {/* Archivos */}
             {files.map((file, index) => (
               <div 
                 key={index} 
@@ -291,7 +426,7 @@ function RightSidebar() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 <span className="text-indigo-300 text-sm" style={{ fontFamily: 'Syncopate, sans-serif' }}>
-                  {files.length} archivo{files.length > 1 ? 's' : ''} listo{files.length > 1 ? 's' : ''}
+                  {totalItems} elemento{totalItems > 1 ? 's' : ''} listo{totalItems > 1 ? 's' : ''}
                 </span>
               </div>
               <svg className="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -330,14 +465,123 @@ function RightSidebar() {
             </div>
           </div>
 
-          {/* Botón de micrófono */}
-          <button className="w-full bg-[#1a1744] border border-gray-600 rounded-xl p-3 hover:border-gray-400 transition-colors flex items-center justify-center gap-2 mb-4">
-            <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-            </svg>
-            <span className="text-gray-300 text-sm" style={{ fontFamily: 'Syncopate, sans-serif' }}>GRABAR</span>
-          </button>
+          {/* Botones de micrófono y categoría */}
+          <div className="flex gap-2 mb-4">
+            {/* Botón de micrófono */}
+            <button className="flex-1 bg-[#1a1744] border border-gray-600 rounded-xl p-3 hover:border-gray-400 transition-colors flex items-center justify-center gap-2">
+              <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                  d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+              </svg>
+              <span className="text-gray-300 text-sm" style={{ fontFamily: 'Syncopate, sans-serif' }}>GRABAR</span>
+            </button>
+
+            {/* Botón de añadir a categoría */}
+            <div className="relative" ref={categoryDropdownRef}>
+              <button 
+                onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
+                className={`bg-[#1a1744] border rounded-xl p-3 hover:border-gray-400 transition-colors flex items-center justify-center gap-2 ${
+                  isCategoryDropdownOpen ? 'border-purple-500' : 'border-gray-600'
+                } ${selectedCategory ? 'border-purple-500/50' : ''}`}
+              >
+                <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M3 12h18M3 17h18" />
+                </svg>
+                <svg className={`w-3 h-3 text-gray-400 transition-transform ${isCategoryDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {/* Dropdown de categorías */}
+              {isCategoryDropdownOpen && (
+                <div className="absolute bottom-full right-0 mb-2 w-64 bg-[#1a1744] border border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                  {/* Barra de búsqueda */}
+                  <div className="p-3 border-b border-gray-700">
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <svg 
+                          className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40"
+                          fill="none" 
+                          stroke="currentColor" 
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <input
+                          type="text"
+                          placeholder="buscar o crear..."
+                          value={categorySearch}
+                          onChange={(e) => setCategorySearch(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && categorySearch.trim() && handleCreateCategory()}
+                          className="w-full bg-white/5 border border-white/10 rounded-lg pl-10 pr-3 py-2 text-white text-sm placeholder-white/40 focus:outline-none focus:border-purple-500/50 transition-colors"
+                        />
+                      </div>
+                      <button
+                        onClick={handleCreateCategory}
+                        disabled={!categorySearch.trim() || isCreatingCategory}
+                        className={`p-2 rounded-lg transition-colors flex items-center justify-center ${
+                          categorySearch.trim() && !isCreatingCategory
+                            ? 'bg-purple-500 hover:bg-purple-400 text-white cursor-pointer'
+                            : 'bg-white/5 text-white/30 cursor-not-allowed'
+                        }`}
+                        title="Crear categoría"
+                      >
+                        {isCreatingCategory ? (
+                          <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                        ) : (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Lista de categorías */}
+                  <div className="max-h-48 overflow-y-auto p-2">
+                    {isLoadingCategories ? (
+                      <div className="flex justify-center py-4">
+                        <OrbitSpinner size={24} />
+                      </div>
+                    ) : filteredCategories.length > 0 ? (
+                      filteredCategories.map((cat) => (
+                        <button
+                          key={cat.id}
+                          onClick={() => {
+                            setSelectedCategory(cat)
+                            setIsCategoryDropdownOpen(false)
+                            setCategorySearch('')
+                          }}
+                          className={`w-full flex items-center gap-3 p-2 rounded-lg transition-colors ${
+                            selectedCategory?.id === cat.id 
+                              ? 'bg-purple-500/20 text-purple-300' 
+                              : 'text-gray-300 hover:bg-white/5'
+                          }`}
+                        >
+                          <div className="w-6 h-6 rounded-md bg-white/10 flex items-center justify-center">
+                            <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M3 12h18M3 17h18" />
+                            </svg>
+                          </div>
+                          <span className="text-sm truncate">{cat.name}</span>
+                          {selectedCategory?.id === cat.id && (
+                            <svg className="w-4 h-4 ml-auto text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </button>
+                      ))
+                    ) : (
+                      <p className="text-gray-500 text-sm text-center py-2">No hay categorías</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Input de Prompt para Archivos (Instrucción) */}
           {hasFiles && !isProcessing && (

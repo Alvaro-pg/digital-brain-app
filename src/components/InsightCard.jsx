@@ -1,3 +1,6 @@
+import { useNavigate } from 'react-router-dom'
+import { useDrag } from '../context/DragContext'
+
 const getIconByType = (type, size = 'small') => {
   const sizeClasses = size === 'small' ? 'w-4 h-4' : 'w-12 h-12'
   
@@ -61,9 +64,35 @@ const getIconByType = (type, size = 'small') => {
   }
 }
 
-function InsightCard({ image, title, category, timeAgo, type = 'folder', isAIGenerated = false }) {
+function InsightCard({ id, image, title, category, timeAgo, type = 'folder', isAIGenerated = false }) {
+  const { startDrag, endDrag } = useDrag()
+  const navigate = useNavigate()
+
+  const handleDragStart = (e) => {
+    const insightData = { id, title, category, type, isAIGenerated, image, timeAgo }
+    e.dataTransfer.setData('application/json', JSON.stringify(insightData))
+    e.dataTransfer.effectAllowed = 'copy'
+    startDrag(insightData)
+  }
+
+  const handleDragEnd = () => {
+    endDrag()
+  }
+
+  const handleClick = (e) => {
+    // Solo navegar si no es un drag
+    if (e.defaultPrevented) return
+    navigate(`/memoria/${id}`)
+  }
+
   return (
-    <div className="flex flex-col gap-2 cursor-pointer group">
+    <div 
+      className="flex flex-col gap-2 cursor-pointer group"
+      draggable
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onClick={handleClick}
+    >
       {/* Imagen o placeholder */}
       <div className={`w-48 h-32 rounded-xl overflow-hidden border relative ${
         isAIGenerated 

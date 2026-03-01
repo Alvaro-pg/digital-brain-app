@@ -28,7 +28,7 @@ function FunnelIcon({ size = 80, isAnimating = false, isDragging = false, classN
       {/* Elipse grande (arriba) */}
       <svg 
         className="transition-transform"
-        style={{ ...animationStyle(0), marginBottom: -size * 0.08 }}
+        style={{ ...animationStyle(0), marginBottom: -size * 0.14 }}
         width={size * 0.5}
         height={size * 0.32}
         viewBox="0 0 65 27" 
@@ -44,7 +44,7 @@ function FunnelIcon({ size = 80, isAnimating = false, isDragging = false, classN
       {/* Elipse mediana (medio) */}
       <svg 
         className="transition-transform"
-        style={{ ...animationStyle(0.08), marginBottom: -size * 0.06 }}
+        style={{ ...animationStyle(0.08), marginBottom: -size * 0.12 }}
         width={size * 0.38}
         height={size * 0.25}
         viewBox="0 0 51 21" 
