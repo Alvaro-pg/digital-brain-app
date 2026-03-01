@@ -98,11 +98,14 @@ const transformDataForECharts = (backendData) => {
 
 function Graficos() {
   const chartRef = useRef(null)
+  const areaChartRef = useRef(null)
   const chartInstance = useRef(null)
+  const areaChartInstance = useRef(null)
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [isEmpty, setIsEmpty] = useState(false)
+  const [activeTab, setActiveTab] = useState('graph') // 'graph' o 'timeline'
   
   // Estados para el panel lateral
   const [selectedKeyword, setSelectedKeyword] = useState(null)
@@ -305,11 +308,214 @@ function Graficos() {
         chartInstance.current.dispose()
         chartInstance.current = null
       }
+      if (areaChartInstance.current) {
+        areaChartInstance.current.dispose()
+        areaChartInstance.current = null
+      }
     }
   }, [])
 
+  // Efecto para el gráfico de barras
+  useEffect(() => {
+    if (!areaChartRef.current || activeTab !== 'timeline') return
+
+    const initBarChart = async () => {
+      try {
+        const response = await fetch('http://localhost:8000/memory/', {
+          headers: { 'Accept': 'application/json' }
+        })
+        
+        if (!response.ok) throw new Error('Error al cargar memorias')
+        const data = await response.json()
+        
+        // Contar memorias por categoría
+        const categoryCounts = {}
+        data.memories.forEach(memory => {
+          const category = memory.tags?.[0] || 'Sin categoría'
+          categoryCounts[category] = (categoryCounts[category] || 0) + 1
+        })
+        
+        // Convertir a array y ordenar de mayor a menor
+        const sortedData = Object.entries(categoryCounts)
+          .map(([name, count]) => ({ name, count }))
+          .sort((a, b) => b.count - a.count)
+        
+        if (!areaChartInstance.current) {
+          areaChartInstance.current = echarts.init(areaChartRef.current, 'dark')
+        }
+        
+        const option = {
+          backgroundColor: 'transparent',
+          title: {
+            text: 'Memorias por Categoría',
+            subtext: 'Distribución de contenido en tu cerebro digital',
+            left: 'center',
+            top: 10,
+            textStyle: {
+              color: '#fff',
+              fontFamily: 'Syncopate, sans-serif',
+              fontSize: 22,
+            },
+            subtextStyle: {
+              color: '#9ca3af',
+              fontFamily: 'Inter, sans-serif',
+              fontSize: 13,
+            },
+          },
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+              type: 'shadow'
+            },
+            backgroundColor: 'rgba(26, 23, 68, 0.95)',
+            borderColor: '#6366f1',
+            borderWidth: 2,
+            textStyle: { 
+              color: '#fff', 
+              fontSize: 13 
+            },
+            formatter: (params) => {
+              const param = params[0]
+              return `
+                <div style="padding: 8px;">
+                  <div style="font-weight: bold; margin-bottom: 6px; color: #a855f7;">${param.name}</div>
+                  <div style="font-size: 14px;"><strong>${param.value}</strong> memoria${param.value !== 1 ? 's' : ''}</div>
+                </div>
+              `
+            }
+          },
+          grid: {
+            left: '3%',
+            right: '4%',
+            bottom: '15%',
+            top: 80,
+            containLabel: true
+          },
+          xAxis: {
+            type: 'category',
+            data: sortedData.map(item => item.name),
+            axisLabel: {
+              interval: 0,
+              rotate: 30,
+              color: '#9ca3af',
+              fontSize: 11,
+              fontFamily: 'Inter, sans-serif'
+            },
+            axisLine: {
+              lineStyle: {
+                color: 'rgba(255, 255, 255, 0.2)'
+              }
+            }
+          },
+          yAxis: {
+            type: 'value',
+            axisLabel: {
+              color: '#9ca3af',
+              fontSize: 12
+            },
+            axisLine: {
+              show: false
+            },
+            splitLine: {
+              lineStyle: {
+                color: 'rgba(255, 255, 255, 0.1)',
+                type: 'dashed'
+              }
+            }
+          },
+          series: {
+            type: 'bar',
+            data: sortedData.map((item, index) => ({
+              value: item.count,
+              itemStyle: {
+                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                  { offset: 0, color: '#a855f7' },
+                  { offset: 1, color: '#6366f1' }
+                ]),
+                borderRadius: [8, 8, 0, 0]
+              }
+            })),
+            emphasis: {
+              itemStyle: {
+                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                  { offset: 0, color: '#c084fc' },
+                  { offset: 1, color: '#818cf8' }
+                ]),
+                shadowBlur: 10,
+                shadowColor: 'rgba(168, 85, 247, 0.5)'
+              }
+            },
+            barWidth: '60%'
+          }
+        }
+        
+        areaChartInstance.current.setOption(option)
+        
+        // Evento de click para explorar memorias de la categoría
+        areaChartInstance.current.off('click') // Remover listeners previos
+        areaChartInstance.current.on('click', async (params) => {
+          if (params.componentType === 'series') {
+            const categoryName = params.name
+            setSelectedKeyword(categoryName)
+            setIsPanelOpen(true)
+            setPanelLoading(true)
+            
+            try {
+              const response = await graphService.getMemoriesByKeyword(categoryName)
+              setMemories(response.memories || [])
+            } catch (err) {
+              console.error('Error cargando memorias:', err)
+              setMemories([])
+            } finally {
+              setPanelLoading(false)
+            }
+          }
+        })
+        
+        const handleBarResize = () => {
+          areaChartInstance.current?.resize()
+        }
+        window.addEventListener('resize', handleBarResize)
+        
+        return () => {
+          window.removeEventListener('resize', handleBarResize)
+        }
+      } catch (err) {
+        console.error('Error loading bar chart data:', err)
+      }
+    }
+    
+    initBarChart()
+  }, [activeTab])
+
   return (
     <div className="flex-1 flex flex-col p-4 relative overflow-hidden">
+      {/* Tabs */}
+      <div className="flex gap-2 mb-4 justify-center">
+        <button
+          onClick={() => setActiveTab('graph')}
+          className={`px-6 py-3 rounded-xl text-sm font-bold transition-all ${
+            activeTab === 'graph'
+              ? 'bg-[#6366f1] text-white shadow-lg shadow-[#6366f1]/30'
+              : 'bg-white/5 text-white/60 hover:bg-white/10'
+          }`}
+          style={{ fontFamily: 'Syncopate, sans-serif', fontWeight: '600' }}
+        >
+          Red Neuronal
+        </button>
+        <button
+          onClick={() => setActiveTab('timeline')}
+          className={`px-6 py-3 rounded-xl text-sm font-bold transition-all ${
+            activeTab === 'timeline'
+              ? 'bg-[#6366f1] text-white shadow-lg shadow-[#6366f1]/30'
+              : 'bg-white/5 text-white/60 hover:bg-white/10'
+          }`}
+          style={{ fontFamily: 'Syncopate, sans-serif', fontWeight: '600' }}
+        >
+          Distribución
+        </button>
+      </div>
+
       {loading && (
         <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-[#201C4E]/50 rounded-2xl gap-4">
           <OrbitSpinner size={60} fadeIn={true} />
@@ -356,7 +562,14 @@ function Graficos() {
       {/* Grafo Principal */}
       <div 
         ref={chartRef} 
-        className={`w-full flex-1 min-h-[500px] rounded-2xl transition-opacity duration-500 ${loading ? 'opacity-0' : 'opacity-100'}`}
+        className={`w-full flex-1 min-h-[500px] rounded-2xl transition-opacity duration-500 ${loading ? 'opacity-0' : 'opacity-100'} ${activeTab === 'graph' ? 'block' : 'hidden'}`}
+        style={{ backgroundColor: 'rgba(26, 23, 68, 0.4)' }}
+      />
+
+      {/* Gráfico de Barras */}
+      <div 
+        ref={areaChartRef} 
+        className={`w-full flex-1 min-h-[500px] rounded-2xl transition-opacity duration-500 ${activeTab === 'timeline' ? 'block' : 'hidden'}`}
         style={{ backgroundColor: 'rgba(26, 23, 68, 0.4)' }}
       />
 

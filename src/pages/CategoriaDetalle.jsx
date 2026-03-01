@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import toast from 'react-hot-toast'
 import InsightCard from '../components/InsightCard'
 import OrbitSpinner from '../components/OrbitSpinner'
 
@@ -95,9 +96,36 @@ function CategoriaDetalle() {
     memory.subcategory?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  // Separar memorias generadas por IA
-  const aiGeneratedMemories = filteredMemories.filter(m => m.isAIGenerated)
-  const regularMemories = filteredMemories.filter(m => !m.isAIGenerated)
+  // Función para eliminar categoría
+  const handleDeleteCategory = async () => {
+    const confirmed = window.confirm(
+      `¿Estás seguro de que quieres eliminar la categoría "${categoryName}"?\n\nEsta acción no se puede deshacer.`
+    )
+    
+    if (!confirmed) return
+    
+    try {
+      const response = await fetch(`http://localhost:8000/tag/${tagId}`, {
+        method: 'DELETE',
+        headers: { 'Accept': 'application/json' }
+      })
+      
+      if (!response.ok) {
+        throw new Error('Error al eliminar categoría')
+      }
+      
+      toast.success('Categoría eliminada correctamente')
+      
+      // Disparar evento para actualizar otras vistas
+      window.dispatchEvent(new CustomEvent('brain:updated'))
+      
+      // Navegar de vuelta a categorías
+      navigate('/categorias')
+    } catch (error) {
+      console.error('Error deleting category:', error)
+      toast.error('Error al eliminar la categoría')
+    }
+  }
 
   return (
     <div className="flex-1 flex flex-col px-16 py-8 overflow-y-auto">
@@ -121,6 +149,17 @@ function CategoriaDetalle() {
           >
             {categoryName || 'cargando...'}
           </h1>
+
+          {/* Botón eliminar categoría */}
+          <button
+            onClick={handleDeleteCategory}
+            className="p-2 hover:bg-red-500/20 rounded-lg transition-colors group"
+            title="Eliminar categoría"
+          >
+            <svg className="w-5 h-5 text-white/40 group-hover:text-red-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
         </div>
         
         {/* Barra de búsqueda */}
@@ -184,35 +223,6 @@ function CategoriaDetalle() {
               ))}
             </div>
           </div>
-
-          {/* Sección: Generadas por IA (si hay) */}
-          {aiGeneratedMemories.length > 0 && (
-            <div>
-              <h2 
-                className="text-white text-lg mb-4 lowercase flex items-center gap-2"
-                style={{ fontFamily: 'Syncopate, sans-serif', fontWeight: '600' }}
-              >
-                <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
-                generado por tu brain ({aiGeneratedMemories.length})
-              </h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-                {aiGeneratedMemories.map((memory) => (
-                  <InsightCard
-                    key={memory.id}
-                    id={memory.id}
-                    image={memory.image}
-                    title={memory.title}
-                    category={memory.subcategory}
-                    timeAgo={memory.timeAgo}
-                    type={memory.type}
-                    isAIGenerated={memory.isAIGenerated}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>

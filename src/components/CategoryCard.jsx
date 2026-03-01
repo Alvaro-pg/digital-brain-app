@@ -62,12 +62,12 @@ const getIconByType = (type) => {
   }
 }
 
-function CategoryCard({ image, name, color = '#1a1744', id, type = 'folder' }) {
+function CategoryCard({ image, name, color = '#1a1744', id, type = 'folder', memoryCount }) {
   return (
     <Link to={`/categoria/${id}`} className="flex flex-col gap-3 cursor-pointer group">
       {/* Imagen de categoría */}
       <div 
-        className="w-52 h-64 rounded-xl overflow-hidden border border-gray-600 group-hover:border-gray-400 transition-colors"
+        className="w-52 h-64 rounded-xl overflow-hidden border border-gray-600 group-hover:border-gray-400 transition-colors relative"
         style={{ backgroundColor: color }}
       >
         {image ? (
@@ -75,6 +75,20 @@ function CategoryCard({ image, name, color = '#1a1744', id, type = 'folder' }) {
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             {getIconByType(type)}
+          </div>
+        )}
+        
+        {/* Número de memorias en el centro */}
+        {memoryCount !== undefined && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="bg-black/60 backdrop-blur-sm px-6 py-3 rounded-2xl border border-white/10">
+              <span 
+                className="text-white text-4xl font-bold"
+                style={{ fontFamily: 'Syncopate, sans-serif' }}
+              >
+                {memoryCount}
+              </span>
+            </div>
           </div>
         )}
       </div>

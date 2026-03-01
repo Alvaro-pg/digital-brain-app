@@ -17,6 +17,11 @@ export const brainService = {
         });
       }
 
+      console.log ("Enviando peticion con los campos: ", {
+        prompt,
+        files: formData.getAll('files'),
+      });
+
       const response = await fetch(`${API_BASE_URL}/brain/ask/single-summary`, {
         method: 'POST',
         body: formData,
@@ -46,10 +51,16 @@ export const brainService = {
         });
       }
 
+      console.log ("Enviando peticion con los campos: ", {
+        prompt,
+        files: formData.getAll('files'),
+      });
+
       const response = await fetch(`${API_BASE_URL}/brain/ask/per-file`, {
         method: 'POST',
         body: formData,
       });
+      
 
       if (!response.ok) {
         const errorData = await response.json();

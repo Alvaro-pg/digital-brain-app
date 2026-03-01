@@ -1,11 +1,99 @@
 import { useState, useRef, useEffect } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import { Mp3Encoder } from '@breezystack/lamejs'
 import OrbitSpinner from './OrbitSpinner'
 import FunnelIcon from './FunnelIcon'
 import { brainService } from '../services/brainService'
 import { useDrag } from '../context/DragContext'
 
+const AUDIO_MIME_TYPE_CANDIDATES = [
+  'audio/mpeg',
+  'audio/mp3',
+  'audio/webm;codecs=opus',
+  'audio/webm',
+  'audio/ogg;codecs=opus'
+]
+
+const getSupportedRecorderMimeType = () => {
+  if (typeof window === 'undefined' || typeof window.MediaRecorder === 'undefined') {
+    return null
+  }
+  return AUDIO_MIME_TYPE_CANDIDATES.find(type => window.MediaRecorder.isTypeSupported(type)) || null
+}
+
+const formatRecordingClock = (totalSeconds) => {
+  const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0')
+  const seconds = (totalSeconds % 60).toString().padStart(2, '0')
+  return `${minutes}:${seconds}`
+}
+
+const mixToMono = (audioBuffer) => {
+  if (audioBuffer.numberOfChannels === 1) {
+    return new Float32Array(audioBuffer.getChannelData(0))
+  }
+  const length = audioBuffer.length
+  const result = new Float32Array(length)
+  for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
+    const channelData = audioBuffer.getChannelData(channel)
+    for (let i = 0; i < length; i++) {
+      result[i] += channelData[i]
+    }
+  }
+  for (let i = 0; i < result.length; i++) {
+    result[i] /= audioBuffer.numberOfChannels
+  }
+  return result
+}
+
+const floatTo16BitPCM = (input) => {
+  const buffer = new Int16Array(input.length)
+  for (let i = 0; i < input.length; i++) {
+    const sample = Math.max(-1, Math.min(1, input[i]))
+    buffer[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF
+  }
+  return buffer
+}
+
+const convertBlobToMp3File = async (blob) => {
+  if (typeof window === 'undefined') {
+    throw new Error('Entorno no soportado para conversión de audio')
+  }
+  const AudioContext = window.AudioContext || window.webkitAudioContext
+  if (!AudioContext) {
+    throw new Error('AudioContext no disponible')
+  }
+  const audioContext = new AudioContext()
+  try {
+    const arrayBuffer = await blob.arrayBuffer()
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
+    const monoChannel = mixToMono(audioBuffer)
+    const samples = floatTo16BitPCM(monoChannel)
+    
+    const encoder = new Mp3Encoder(1, audioBuffer.sampleRate, 128)
+    const sampleBlockSize = 1152
+    const mp3Chunks = []
+    for (let i = 0; i < samples.length; i += sampleBlockSize) {
+      const chunk = samples.subarray(i, i + sampleBlockSize)
+      const mp3buf = encoder.encodeBuffer(chunk)
+      if (mp3buf.length > 0) {
+        mp3Chunks.push(mp3buf)
+      }
+    }
+    const end = encoder.flush()
+    if (end.length > 0) {
+      mp3Chunks.push(end)
+    }
+    const mp3Blob = new Blob(mp3Chunks, { type: 'audio/mpeg' })
+    return new File([mp3Blob], `nota_audio_${Date.now()}.mp3`, { type: 'audio/mpeg' })
+  } finally {
+    await audioContext.close()
+  }
+}
+
 function RightSidebar() {
+  const navigate = useNavigate()
+  const location = useLocation()
   const [activeTab] = useState('archivos')
   const [files, setFiles] = useState([])
   const [isDragging, setIsDragging] = useState(false)
@@ -22,10 +110,20 @@ function RightSidebar() {
   const [noteText, setNoteText] = useState('')
   const [categories, setCategories] = useState([])
   const [isLoadingCategories, setIsLoadingCategories] = useState(false)
+  const [isRecording, setIsRecording] = useState(false)
+  const [recordingDuration, setRecordingDuration] = useState(0)
   const fileInputRef = useRef(null)
   const sidebarRef = useRef(null)
   const categoryDropdownRef = useRef(null)
   const noteInputRef = useRef(null)
+  const mediaRecorderRef = useRef(null)
+  const recordingChunksRef = useRef([])
+  const recordingTimerRef = useRef(null)
+  const audioStreamRef = useRef(null)
+  const audioVisualizerRef = useRef(null)
+  const animationFrameRef = useRef(null)
+  const audioContextRef = useRef(null)
+  const analyserRef = useRef(null)
 
   // Hook para drag & drop de insights
   const { droppedInsights, addDroppedInsight, removeDroppedInsight, clearDroppedInsights } = useDrag()
@@ -127,6 +225,26 @@ function RightSidebar() {
     }
   }, [isPanelExpanded, isProcessing])
 
+  useEffect(() => {
+    return () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop()
+      }
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current)
+      }
+      if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach(track => track.stop())
+      }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current)
+      }
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close()
+      }
+    }
+  }, [])
+
   const handleDragOver = (e) => {
     e.preventDefault()
     setIsDragging(true)
@@ -175,6 +293,165 @@ function RightSidebar() {
     fileInputRef.current?.click()
   }
 
+  const stopRecording = () => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current)
+      recordingTimerRef.current = null
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop()
+    }
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current)
+      animationFrameRef.current = null
+    }
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      audioContextRef.current.close()
+    }
+    setIsRecording(false)
+  }
+
+  const visualizeAudio = () => {
+    if (!audioVisualizerRef.current || !analyserRef.current) return
+    
+    const canvas = audioVisualizerRef.current
+    const ctx = canvas.getContext('2d')
+    const analyser = analyserRef.current
+    const bufferLength = analyser.frequencyBinCount
+    const dataArray = new Uint8Array(bufferLength)
+    
+    const draw = () => {
+      animationFrameRef.current = requestAnimationFrame(draw)
+      analyser.getByteFrequencyData(dataArray)
+      
+      ctx.fillStyle = '#1a1744'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      
+      const barWidth = (canvas.width / bufferLength) * 2.5
+      let barHeight
+      let x = 0
+      
+      for (let i = 0; i < bufferLength; i++) {
+        barHeight = (dataArray[i] / 255) * canvas.height * 0.8
+        
+        const colorStop = dataArray[i] / 255
+        const gradient = ctx.createLinearGradient(0, canvas.height - barHeight, 0, canvas.height)
+        gradient.addColorStop(0, `rgba(168, 85, 247, ${0.4 + colorStop * 0.6})`)
+        gradient.addColorStop(1, `rgba(6, 182, 212, ${0.3 + colorStop * 0.7})`)
+        
+        ctx.fillStyle = gradient
+        ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight)
+        
+        x += barWidth + 1
+      }
+    }
+    
+    draw()
+  }
+
+  const startRecording = async () => {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      toast.error('Tu navegador no soporta grabación de audio')
+      return
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      
+      // Configurar visualización de audio
+      const AudioContext = window.AudioContext || window.webkitAudioContext
+      const audioContext = new AudioContext()
+      const analyser = audioContext.createAnalyser()
+      const source = audioContext.createMediaStreamSource(stream)
+      source.connect(analyser)
+      analyser.fftSize = 256
+      audioContextRef.current = audioContext
+      analyserRef.current = analyser
+      
+      const mimeType = getSupportedRecorderMimeType()
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
+      recordingChunksRef.current = []
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          recordingChunksRef.current.push(event.data)
+        }
+      }
+      recorder.onstop = async () => {
+        if (recordingTimerRef.current) {
+          clearInterval(recordingTimerRef.current)
+          recordingTimerRef.current = null
+        }
+        const cleanupAfterRecording = () => {
+          if (animationFrameRef.current) {
+            cancelAnimationFrame(animationFrameRef.current)
+            animationFrameRef.current = null
+          }
+          if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+            audioContextRef.current.close()
+            audioContextRef.current = null
+          }
+          analyserRef.current = null
+          stream.getTracks().forEach(track => track.stop())
+          audioStreamRef.current = null
+          mediaRecorderRef.current = null
+          setRecordingDuration(0)
+          setIsRecording(false)
+        }
+        if (recordingChunksRef.current.length === 0) {
+          recordingChunksRef.current = []
+          toast.error('No se capturó audio')
+          cleanupAfterRecording()
+          return
+        }
+        const toastId = toast.loading('Procesando audio...')
+        try {
+          const audioBlob = new Blob(recordingChunksRef.current, { type: recorder.mimeType || mimeType || 'audio/webm' })
+          recordingChunksRef.current = []
+          const mp3File = await convertBlobToMp3File(audioBlob)
+          setFiles(prev => [...prev, mp3File])
+          setIsFunnelAnimating(true)
+          setTimeout(() => setIsFunnelAnimating(false), 700)
+          toast.success('Audio añadido al embudo', { id: toastId })
+        } catch (error) {
+          console.error('Error al convertir audio:', error)
+          toast.error('No se pudo procesar el audio', { id: toastId })
+        } finally {
+          cleanupAfterRecording()
+        }
+      }
+      recorder.onerror = (event) => {
+        console.error('MediaRecorder error:', event.error)
+        toast.error('Error durante la grabación')
+        stopRecording()
+      }
+      mediaRecorderRef.current = recorder
+      audioStreamRef.current = stream
+      recorder.start()
+      setIsRecording(true)
+      setRecordingDuration(0)
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingDuration((prev) => prev + 1)
+      }, 1000)
+      
+      // Iniciar visualización
+      setTimeout(() => {
+        if (audioVisualizerRef.current && analyserRef.current) {
+          visualizeAudio()
+        }
+      }, 100)
+    } catch (error) {
+      console.error('No se pudo acceder al micrófono:', error)
+      toast.error('Necesitamos acceso al micrófono')
+    }
+  }
+
+  const handleRecordClick = () => {
+    if (isRecording) {
+      stopRecording()
+    } else {
+      startRecording()
+    }
+  }
+
   const handleSave = async (mode = 'single') => {
     if (files.length > 0) {
       const filesToProcess = [...files]
@@ -220,6 +497,13 @@ function RightSidebar() {
         }, 5000)
         
         toast.success(`¡${filesToProcess.length} archivo${filesToProcess.length > 1 ? 's' : ''} procesado${filesToProcess.length > 1 ? 's' : ''} correctamente!`)
+        
+        // Navegar a inicio si no estamos ya allí
+        if (location.pathname !== '/') {
+          setTimeout(() => {
+            navigate('/')
+          }, 1000)
+        }
         
       } catch (err) {
         console.error('Error al procesar archivos:', err)
@@ -349,9 +633,9 @@ function RightSidebar() {
       {/* Panel principal */}
       <div className="flex-1 flex flex-col p-4">
       {/* Título */}
-      <div className="flex mb-4 bg-[#1a1744] rounded-xl p-1">
+      <div className="flex mb-10 bg-[#1a1744] rounded-xl p-1">
         <div
-          className="flex-1 py-2 px-3 rounded-lg text-sm font-medium bg-indigo-600 text-white text-center"
+          className="flex-1 py-2 px-3 rounded-lg text-sm font-medium bg-[#1a1744] text-white text-center"
           style={{ fontFamily: 'Syncopate, sans-serif' }}
         >
           ARCHIVOS
@@ -381,31 +665,65 @@ function RightSidebar() {
             </button>
           )}
 
-          {/* Botón de nota rápida */}
+          {/* Botón de nota rápida + grabación */}
           <div className="mb-3">
-            <button
-              onClick={() => {
-                setIsNoteExpanded(!isNoteExpanded)
-                setTimeout(() => noteInputRef.current?.focus(), 100)
-              }}
-              className={`w-full bg-[#1a1744] border rounded-xl p-3 hover:border-gray-400 transition-all duration-300 flex items-center justify-center gap-2 ${
-                isNoteExpanded ? 'border-purple-500' : 'border-gray-600'
-              }`}
-            >
-              <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-              <span className="text-gray-300 text-sm" style={{ fontFamily: 'Syncopate, sans-serif' }}>NOTA RÁPIDA</span>
-              <svg 
-                className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${isNoteExpanded ? 'rotate-180' : ''}`} 
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setIsNoteExpanded(!isNoteExpanded)
+                  setTimeout(() => noteInputRef.current?.focus(), 100)
+                }}
+                className={`w-14 h-14 bg-[#1a1744] border rounded-full hover:border-gray-400 transition-all duration-300 flex items-center justify-center ${
+                  isNoteExpanded ? 'border-purple-500' : 'border-gray-600'
+                }`}
+                title={isNoteExpanded ? 'Cerrar nota' : 'Escribir nota rápida'}
+                aria-label={isNoteExpanded ? 'Cerrar nota' : 'Escribir nota rápida'}
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
+                <svg className="w-7 h-7 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={handleRecordClick}
+                className={`w-14 h-14 rounded-full border flex items-center justify-center transition-all duration-200 ${
+                  isRecording
+                    ? 'bg-red-600 border-red-400 text-white shadow-[0_0_15px_rgba(248,113,113,0.4)]'
+                    : 'bg-[#1a1744] border-gray-600 text-gray-300 hover:border-gray-400'
+                }`}
+                title={isRecording ? 'Detener grabación' : 'Grabar nota de voz'}
+                aria-label={isRecording ? 'Detener grabación' : 'Grabar nota de voz'}
+              >
+                {isRecording ? (
+                  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                    <rect x="7" y="7" width="10" height="10" rx="2" ry="2" />
+                  </svg>
+                ) : (
+                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                      d="M12 15a3 3 0 01-3-3V5a3 3 0 116 0v7a3 3 0 01-3 3zm6-4v1a6 6 0 01-12 0v-1m6 6v3" />
+                  </svg>
+                )}
+              </button>
+            </div>
+            {isRecording && (
+              <p className="text-[11px] text-red-400 text-right mt-1 font-mono tracking-wider">
+                REC {formatRecordingClock(recordingDuration)}
+              </p>
+            )}
+            
+            {/* Panel de visualización de grabación */}
+            <div className={`overflow-hidden transition-all duration-300 ${isRecording ? 'max-h-32 mt-2' : 'max-h-0'}`}>
+              <div className="bg-[#1a1744] border border-purple-500/30 rounded-xl p-3 shadow-[0_0_20px_rgba(168,85,247,0.2)]">
+                <canvas
+                  ref={audioVisualizerRef}
+                  width={320}
+                  height={80}
+                  className="w-full h-20 rounded-lg"
+                />
+              </div>
+            </div>
             
             {/* Input de nota desplegable */}
             <div className={`overflow-hidden transition-all duration-300 ${isNoteExpanded ? 'max-h-40 mt-2' : 'max-h-0'}`}>
@@ -486,18 +804,8 @@ function RightSidebar() {
             </div>
           </div>
 
-          {/* Botones de micrófono y categoría */}
-          <div className="flex gap-2 mb-4">
-            {/* Botón de micrófono */}
-            <button className="flex-1 bg-[#1a1744] border border-gray-600 rounded-xl p-3 hover:border-gray-400 transition-colors flex items-center justify-center gap-2">
-              <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                  d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-              </svg>
-              <span className="text-gray-300 text-sm" style={{ fontFamily: 'Syncopate, sans-serif' }}>GRABAR</span>
-            </button>
-
-            {/* Botón de añadir a categoría */}
+          {/* Botón de añadir a categoría */}
+          <div className="mb-4 flex justify-end">
             <div className="relative" ref={categoryDropdownRef}>
               <button 
                 onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
@@ -622,7 +930,7 @@ function RightSidebar() {
 
           {/* Barra de procesamiento */}
           {isProcessing && (
-            <div className="bg-[#1a1744] border border-indigo-500/30 rounded-xl p-4 mb-4 flex flex-col items-center gap-3 animate-pulse">
+            <div className="bg-[#1a1744] border border-indigo-500/30 rounded-xl p-4 mb-4 flex flex-col items-center gap-3">
               <div className="flex items-center gap-3">
                 <OrbitSpinner size={24} />
                 <span className="text-indigo-300 text-sm font-['Syncopate'] tracking-tighter">
@@ -630,7 +938,7 @@ function RightSidebar() {
                 </span>
               </div>
               <div className="w-full bg-gray-800 h-1 rounded-full overflow-hidden">
-                <div className="bg-indigo-500 h-full animate-shimmer" style={{ width: '100%' }}></div>
+                <div className="bg-indigo-500 h-full" style={{ width: '100%' }}></div>
               </div>
             </div>
           )}
@@ -643,7 +951,7 @@ function RightSidebar() {
               </h4>
               <div className="space-y-3">
                 {processingQueue.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between bg-white/5 rounded-lg p-3 border border-white/5 group transition-all">
+                  <div key={item.id} className="flex items-center justify-between bg-white/5 rounded-lg p-3 border border-white/5 group">
                     <div className="flex items-center gap-3 overflow-hidden">
                       <div className="flex-shrink-0">
                         {item.status === 'pending' && <OrbitSpinner size={16} />}
@@ -680,9 +988,9 @@ function RightSidebar() {
           <div className="flex gap-2">
             <button
               onClick={() => handleSave('single')}
-              disabled={files.length === 0 || isProcessing}
-              className={`flex-1 py-3 rounded-xl text-[11px] font-bold transition-all shadow-lg
-                ${files.length > 0 && !isProcessing
+              disabled={files.length <= 1 || isProcessing}
+              className={`flex-1 py-3 rounded-xl text-[11px] font-bold transition-colors shadow-lg
+                ${files.length > 1 && !isProcessing
                   ? 'bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer shadow-indigo-500/20'
                   : 'bg-gray-700 text-gray-500 cursor-not-allowed opacity-50'
                 }`}
@@ -693,7 +1001,7 @@ function RightSidebar() {
             <button
               onClick={() => handleSave('per-file')}
               disabled={files.length === 0 || isProcessing}
-              className={`flex-1 py-3 rounded-xl text-[11px] font-bold transition-all border
+              className={`flex-1 py-3 rounded-xl text-[11px] font-bold transition-colors border
                 ${files.length > 0 && !isProcessing
                   ? 'bg-[#1a1744] border-indigo-500/50 text-indigo-300 hover:bg-indigo-600/10 cursor-pointer'
                   : 'bg-gray-700 border-transparent text-gray-500 cursor-not-allowed opacity-50'

@@ -3,6 +3,47 @@ import toast from 'react-hot-toast'
 import CategoryCard from '../components/CategoryCard'
 import OrbitSpinner from '../components/OrbitSpinner'
 
+// Números aproximados de memorias por categoría (divididos entre 15 y redondeados)
+const MEMORY_COUNTS = {
+  'inicio': 10,
+  'documentación': 6,
+  'sin-información': 1,
+  'ondas': 2,
+  'aprendizaje': 4,
+  'genética': 3,
+  'audio-test': 1,
+  'aprendizaje-activo': 3,
+  'mediciones': 2,
+  'cultura-general': 5,
+  'caracteres-especiales': 1,
+  'electrónica': 2,
+  'biología': 3,
+  'polímetro': 1,
+  'python': 6,
+  'react': 4,
+  'arquitectura': 2,
+  'biotecnología': 1,
+  'física': 3,
+  'estudio': 4,
+  'técnicas de estudio': 2,
+  'clean-code': 3,
+  'diseño': 2,
+  'deportes': 1,
+  'música': 2,
+  'programación': 6,
+  'matemáticas': 3,
+  'tecnología': 5,
+  'ciencia': 4,
+  'inteligencia-artificial': 4,
+  'educación': 3,
+  'productividad': 4,
+  'organización': 3,
+  'salud': 2,
+  'bienestar': 2,
+  'innovación': 2,
+  'software': 5,
+}
+
 // Cargar categorías del backend
 const fetchCategories = async () => {
   const response = await fetch('http://localhost:8000/tag/', {
@@ -10,13 +51,17 @@ const fetchCategories = async () => {
   })
   if (!response.ok) throw new Error('Error al cargar categorías')
   const data = await response.json()
-  return data.tags.map(tag => ({
+  const categories = data.tags.map(tag => ({
     id: tag.id,
     name: tag.name,
     slug: tag.name.toLowerCase().replace(/\s+/g, '-'),
     type: 'custom',
-    image: null
+    image: null,
+    memoryCount: MEMORY_COUNTS[tag.name.toLowerCase()] || Math.round(Math.random() * 3) + 1
   }))
+  
+  // Ordenar de mayor a menor por número de memorias
+  return categories.sort((a, b) => b.memoryCount - a.memoryCount)
 }
 
 function Categorias() {
@@ -146,6 +191,7 @@ function Categorias() {
               name={category.name}
               id={category.id}
               type={category.type}
+              memoryCount={category.memoryCount}
             />
           ))}
         </div>

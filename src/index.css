@@ -28,6 +28,7 @@ body {
   min-height: 100vh;
 }
 
+/* Commented out to avoid conflicts with Tailwind CSS custom styles
 button {
   border-radius: 8px;
   border: 1px solid transparent;
@@ -46,6 +47,7 @@ button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
+*/
 
 @media (prefers-color-scheme: light) {
   :root {
@@ -55,9 +57,9 @@ button:focus-visible {
   a:hover {
     color: #747bff;
   }
-  button {
+  /* button {
     background-color: #f9f9f9;
-  }
+  } */
 }
 
 /* Animaciones del OrbitSpinner */

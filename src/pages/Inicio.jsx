@@ -6,6 +6,46 @@ import CategoryFilter from '../components/CategoryFilter'
 import DynamicCalendar from '../components/DynamicCalendar'
 import OrbitSpinner from '../components/OrbitSpinner'
 
+// Skeleton Components
+const InsightCardSkeleton = () => (
+  <div className="flex flex-col gap-2 animate-pulse">
+    <div className="w-48 h-32 rounded-xl bg-white/5 border border-gray-700" />
+    <div className="flex items-start gap-2">
+      <div className="w-8 h-8 rounded-full bg-white/5 flex-shrink-0" />
+      <div className="flex flex-col gap-2 flex-1">
+        <div className="h-3 bg-white/5 rounded w-32" />
+        <div className="h-2 bg-white/5 rounded w-24" />
+        <div className="h-2 bg-white/5 rounded w-16" />
+      </div>
+    </div>
+  </div>
+)
+
+const CategoryCardSkeleton = () => (
+  <div className="flex flex-col gap-3 animate-pulse flex-shrink-0">
+    <div className="w-52 h-64 rounded-xl bg-white/5 border border-gray-700" />
+    <div className="flex items-center gap-2">
+      <div className="w-7 h-7 rounded bg-white/5" />
+      <div className="h-3 bg-white/5 rounded w-32" />
+    </div>
+  </div>
+)
+
+const BrainInsightSkeleton = () => (
+  <div className="w-full flex items-center gap-4 p-4 rounded-xl border border-gray-700 bg-[#1a1744] animate-pulse">
+    <div className="w-12 h-12 rounded-xl bg-white/5 flex-shrink-0" />
+    <div className="flex-1 flex flex-col gap-2">
+      <div className="h-4 bg-white/5 rounded w-3/4" />
+      <div className="h-3 bg-white/5 rounded w-1/2" />
+      <div className="h-2 bg-white/5 rounded w-full" />
+    </div>
+    <div className="flex items-center gap-3 flex-shrink-0">
+      <div className="h-5 w-20 bg-white/5 rounded-full" />
+      <div className="h-3 w-16 bg-white/5 rounded" />
+    </div>
+  </div>
+)
+
 // Helper para calcular tiempo relativo
 const getTimeAgo = (dateString) => {
   const now = new Date()
@@ -46,57 +86,71 @@ function Inicio() {
   }
 
   // Cargar memorias y categorías del backend
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true)
-      try {
-        const [memoriesRes, tagsRes] = await Promise.all([
-          fetch('http://localhost:8000/memory/', {
-            headers: { 'Accept': 'application/json' }
-          }),
-          fetch('http://localhost:8000/tag/', {
-            headers: { 'Accept': 'application/json' }
-          })
-        ])
-        
-        if (!memoriesRes.ok) throw new Error('Error al cargar memorias')
-        const memoriesData = await memoriesRes.json()
-        
-        // Mapear memorias al formato esperado
-        const mappedMemories = memoriesData.memories.map(memory => ({
-          id: memory.id,
-          title: memory.summary || memory.keyword,
-          category: memory.tags?.[0] || memory.type,
-          subcategory: memory.keyword,
-          timeAgo: getTimeAgo(memory.created_at),
-          createdAt: new Date(memory.created_at),
-          image: null,
-          type: memory.type === 'youtube' ? 'youtube' : memory.type === 'nota' ? 'pdf' : 'code',
-          isAIGenerated: memory.generated === true,
-          description: memory.raw_content
-        }))
-        
-        // Ordenar de más nuevo a más viejo
-        mappedMemories.sort((a, b) => b.createdAt - a.createdAt)
-        
-        setMemories(mappedMemories)
-        
-        // Extraer categorías únicas para el filtro
-        const uniqueCategories = ['Inicio', ...new Set(mappedMemories.map(m => m.category).filter(Boolean))]
-        setFilterCategories(uniqueCategories)
-        
-        // Cargar categorías/tags
-        if (tagsRes.ok) {
-          const tagsData = await tagsRes.json()
-          setCategories(tagsData.tags || [])
-        }
-      } catch (error) {
-        console.error('Error fetching data:', error)
-      } finally {
-        setLoading(false)
+  const fetchData = async () => {
+    setLoading(true)
+    try {
+      const [memoriesRes, tagsRes] = await Promise.all([
+        fetch('http://localhost:8000/memory/', {
+          headers: { 'Accept': 'application/json' }
+        }),
+        fetch('http://localhost:8000/tag/', {
+          headers: { 'Accept': 'application/json' }
+        })
+      ])
+      
+      if (!memoriesRes.ok) throw new Error('Error al cargar memorias')
+      const memoriesData = await memoriesRes.json()
+      
+      // Mapear memorias al formato esperado
+      const mappedMemories = memoriesData.memories.map(memory => ({
+        id: memory.id,
+        title: memory.summary || memory.keyword,
+        category: memory.tags?.[0] || memory.type,
+        subcategory: memory.keyword,
+        timeAgo: getTimeAgo(memory.created_at),
+        createdAt: new Date(memory.created_at),
+        image: null,
+        type: memory.type === 'youtube' ? 'youtube' : memory.type === 'nota' ? 'pdf' : 'code',
+        isAIGenerated: memory.generated === true,
+        description: memory.raw_content
+      }))
+      
+      // Ordenar de más nuevo a más viejo
+      mappedMemories.sort((a, b) => b.createdAt - a.createdAt)
+      
+      setMemories(mappedMemories)
+      
+      // Extraer categorías únicas para el filtro
+      const uniqueCategories = ['Inicio', ...new Set(mappedMemories.map(m => m.category).filter(Boolean))]
+      setFilterCategories(uniqueCategories)
+      
+      // Cargar categorías/tags
+      if (tagsRes.ok) {
+        const tagsData = await tagsRes.json()
+        setCategories(tagsData.tags || [])
       }
+    } catch (error) {
+      console.error('Error fetching data:', error)
+    } finally {
+      setLoading(false)
     }
+  }
+
+  useEffect(() => {
     fetchData()
+  }, [])
+
+  // Escuchar eventos de actualización del brain
+  useEffect(() => {
+    const handleBrainUpdate = () => {
+      console.log('Brain updated, reloading data...')
+      fetchData()
+    }
+
+    window.addEventListener('brain:updated', handleBrainUpdate)
+    return () => {
+      window.removeEventListener('brain:updated', handleBrainUpdate)
+    }
   }, [])
 
   // Filtrar insights según categoría activa
@@ -106,6 +160,21 @@ function Inicio() {
 
   // Filtrar solo los insights generados por el brain
   const brainInsights = memories.filter(insight => insight.isAIGenerated)
+
+  // Calcular las 3 categorías con más memorias
+  const topCategories = (() => {
+    const categoryCounts = {}
+    memories.forEach(memory => {
+      const cat = memory.category
+      if (cat) {
+        categoryCounts[cat] = (categoryCounts[cat] || 0) + 1
+      }
+    })
+    return Object.entries(categoryCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([name, count]) => ({ name, count }))
+  })()
 
   return (
     <div className="flex-1 flex flex-col px-6 py-6 overflow-y-auto">
@@ -132,7 +201,7 @@ function Inicio() {
             className="text-white text-xl lowercase"
             style={{ fontFamily: 'Syncopate, sans-serif', fontWeight: '600' }}
           >
-            {activeCategory === 'Inicio' ? 'vuelve a tus últimas memorias' : `insights de ${activeCategory.toLowerCase()}`}
+            {activeCategory === 'Inicio' ? 'vuelve a tus últimas memorias' : `memorias de ${activeCategory.toLowerCase()}`}
           </h2>
           {activeCategory === 'Inicio' && (
             <span
@@ -140,15 +209,19 @@ function Inicio() {
               className="text-white/40 hover:text-white/70 text-xs lowercase cursor-pointer transition-colors"
               style={{ fontFamily: 'Syncopate, sans-serif', fontWeight: '600' }}
             >
-              mostrar todos
+              mostrar todas
             </span>
           )}
         </div>
         <div className="flex gap-6 overflow-x-auto pb-4">
           {loading ? (
-            <div className="flex items-center justify-center w-full py-8">
-              <OrbitSpinner size={40} />
-            </div>
+            <>
+              <InsightCardSkeleton />
+              <InsightCardSkeleton />
+              <InsightCardSkeleton />
+              <InsightCardSkeleton />
+              <InsightCardSkeleton />
+            </>
           ) : filteredInsights.length > 0 ? (
             filteredInsights.map((insight) => (
               <InsightCard
@@ -178,9 +251,11 @@ function Inicio() {
         </h2>
         <div className="flex flex-col gap-3">
           {loading ? (
-            <div className="flex items-center justify-center w-full py-8">
-              <OrbitSpinner size={40} />
-            </div>
+            <>
+              <BrainInsightSkeleton />
+              <BrainInsightSkeleton />
+              <BrainInsightSkeleton />
+            </>
           ) : brainInsights.length > 0 ? (
             brainInsights.map((insight) => (
               <div 
@@ -264,9 +339,13 @@ function Inicio() {
               style={{ transform: `translateX(-${categoryIndex * CATEGORY_CARD_WIDTH}px)` }}
             >
               {loading ? (
-                <div className="flex items-center justify-center w-full py-8">
-                  <OrbitSpinner size={40} />
-                </div>
+                <>
+                  <CategoryCardSkeleton />
+                  <CategoryCardSkeleton />
+                  <CategoryCardSkeleton />
+                  <CategoryCardSkeleton />
+                  <CategoryCardSkeleton />
+                </>
               ) : categories.length > 0 ? (
                 categories.map((category) => (
                   <div key={category.id} className="flex-shrink-0">
@@ -301,6 +380,46 @@ function Inicio() {
           </button>
         </div>
       </div>
+
+      {/* Secciones: Top 3 Categorías con más memorias */}
+      {activeCategory === 'Inicio' && topCategories.map((topCat, idx) => {
+        const categoryMemories = memories.filter(m => m.category === topCat.name).slice(0, 6)
+        if (categoryMemories.length === 0) return null
+        
+        return (
+          <div key={topCat.name} className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 
+                className="text-white text-xl lowercase"
+                style={{ fontFamily: 'Syncopate, sans-serif', fontWeight: '600' }}
+              >
+                {topCat.name.toLowerCase()}
+              </h2>
+              <span
+                onClick={() => setActiveCategory(topCat.name)}
+                className="text-white/40 hover:text-white/70 text-xs lowercase cursor-pointer transition-colors"
+                style={{ fontFamily: 'Syncopate, sans-serif', fontWeight: '600' }}
+              >
+                ver todas
+              </span>
+            </div>
+            <div className="flex gap-6 overflow-x-auto pb-4">
+              {categoryMemories.map((insight) => (
+                <InsightCard
+                  key={insight.id}
+                  id={insight.id}
+                  image={insight.image}
+                  title={insight.title}
+                  category={insight.subcategory}
+                  timeAgo={insight.timeAgo}
+                  type={insight.type}
+                  isAIGenerated={insight.isAIGenerated}
+                />
+              ))}
+            </div>
+          </div>
+        )
+      })}
       </div>
     </div>
   )

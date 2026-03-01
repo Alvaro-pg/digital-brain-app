@@ -171,7 +171,7 @@ function DynamicCalendar() {
     return (
       <div className="flex gap-0.5 justify-center mt-0.5">
         {events.slice(0, 3).map((event, i) => (
-          <div key={i} className={`${dotSize} rounded-full ${eventColors[event.color]}`} />
+          <div key={i} className={`${dotSize} rounded-full bg-purple-500`} />
         ))}
       </div>
     )
@@ -192,7 +192,7 @@ function DynamicCalendar() {
             className="text-white text-xl lowercase"
             style={{ fontFamily: 'Syncopate, sans-serif', fontWeight: '600' }}
           >
-            {MONTHS[calendarData.month]} {calendarData.year}
+            calendario - {MONTHS[calendarData.month]} {calendarData.year}
           </h2>
           <div className="flex gap-2">
             <button 
@@ -282,7 +282,7 @@ function DynamicCalendar() {
                   key={event.id}
                   className="flex items-center gap-3 p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-all cursor-pointer"
                 >
-                  <div className={`w-2 h-2 rounded-full ${eventColors[event.color]}`} />
+                  <div className="w-2 h-2 rounded-full bg-purple-500" />
                   <div className="flex-1">
                     <span className="text-white text-sm">{event.title}</span>
                   </div>

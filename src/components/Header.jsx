@@ -75,12 +75,14 @@ function Header() {
 
   return (
     <header className="w-full py-4 px-6 flex flex-col items-center bg-gradient-to-b from-[#090816] to-transparent">
-      <NavLink to="/">
+      
+      
+      <NavLink to="/" style={{ marginTop: '20px', display: 'block' }}>
+      
         <img 
-          src={digitalBrainLogo} 
+          src={digitalBrainLogo}
           alt="Digital Brain" 
-          className="mt-3"
-          style={{ height: 'auto', width: '30px' }} 
+          style={{ height: 'auto', width: '30px', display: 'block' }} 
         />
       </NavLink>
       <nav className="flex gap-8 mt-4" style={{ fontFamily: 'Syncopate, sans-serif' }}>

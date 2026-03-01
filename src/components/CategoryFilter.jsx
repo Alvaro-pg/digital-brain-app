@@ -57,7 +57,7 @@ function CategoryFilter({ categories, activeCategory, onCategoryChange }) {
     <div className="relative w-full" ref={dropdownRef}>
       <div 
         ref={containerRef}
-        className="flex items-center gap-1 bg-[#1a1744] rounded-full p-1 w-full"
+        className="flex items-center gap-1 bg-[#1a1744] rounded-lg p-1 w-full"
       >
         <div ref={innerRef} className="flex gap-1 overflow-hidden flex-1">
           {visibleCategories.map((category) => (

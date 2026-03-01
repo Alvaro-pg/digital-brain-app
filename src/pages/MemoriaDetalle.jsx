@@ -1,5 +1,6 @@
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
+import toast from 'react-hot-toast'
 import OrbitSpinner from '../components/OrbitSpinner'
 
 // Helper para calcular tiempo relativo
@@ -39,10 +40,10 @@ const renderFilePreview = (url) => {
     return <video controls src={fullUrl} className="w-full max-h-[500px] rounded-xl shadow-lg border border-[#6366f1]/20 bg-black/20" />;
   }
   if (['pdf'].includes(ext)) {
-    return <iframe src={fullUrl} className="w-full h-[500px] rounded-xl shadow-lg border border-[#6366f1]/20 bg-white" title="PDF Preview" />;
+    return <iframe src={fullUrl} className="w-full h-[500px] rounded-xl shadow-lg border border-[#6366f1]/20 bg-[#0f0d24]" title="PDF Preview" />;
   }
   if(['txt', 'md'].includes(ext)) {
-      return <iframe src={fullUrl} className="w-full h-[200px] rounded-xl shadow-lg border border-[#6366f1]/20 bg-white" title="Document Preview" />;
+      return <iframe src={fullUrl} className="w-full h-[200px] rounded-xl shadow-lg border border-[#6366f1]/20 bg-[#0f0d24]" title="Document Preview" />;
   }
   
 if ([
@@ -52,7 +53,7 @@ if ([
   return (
     <iframe
       src={fullUrl}
-      className="w-full h-[200px] rounded-xl shadow-lg border border-[#6366f1]/20 bg-white"
+      className="w-full h-[200px] rounded-xl shadow-lg border border-[#6366f1]/20 bg-[#0f0d24]"
       title="Code Preview"
     />
   );  
@@ -108,10 +109,12 @@ const getIconByType = (type) => {
 
 function MemoriaDetalle() {
   const { memoryId } = useParams()
+  const navigate = useNavigate()
   const [memory, setMemory] = useState(null)
   const [allTags, setAllTags] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // Cargar memoria y tags del backend
   useEffect(() => {
@@ -150,6 +153,32 @@ function MemoriaDetalle() {
   const getTagId = (tagName) => {
     const tag = allTags.find(t => t.name === tagName)
     return tag ? tag.id : null
+  }
+
+  // Función para eliminar memoria
+  const handleDelete = async () => {
+    if (!confirm('¿Estás seguro de que quieres eliminar esta memoria? Esta acción no se puede deshacer.')) {
+      return
+    }
+
+    setIsDeleting(true)
+    try {
+      const response = await fetch(`http://localhost:8000/memory/${memoryId}`, {
+        method: 'DELETE',
+        headers: { 'Accept': 'application/json' }
+      })
+
+      if (!response.ok) throw new Error('Error al eliminar la memoria')
+
+      toast.success('Memoria eliminada correctamente')
+      window.dispatchEvent(new CustomEvent('brain:updated'))
+      navigate('/')
+    } catch (err) {
+      console.error('Error deleting memory:', err)
+      toast.error('No se pudo eliminar la memoria')
+    } finally {
+      setIsDeleting(false)
+    }
   }
 
   if (isLoading) {
@@ -214,6 +243,23 @@ function MemoriaDetalle() {
                   procesado
                 </span>
               )}
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="ml-auto p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Eliminar memoria"
+              >
+                {isDeleting ? (
+                  <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                )}
+              </button>
             </div>
             <p className="text-gray-400 text-sm mb-1">
               Keyword: <span className="text-white">{memory.keyword}</span>
